@@ -1,0 +1,128 @@
+import { useEffect } from 'react';
+import { Icon } from '@/components/ui/icon';
+import { Text } from '@/components/ui/text';
+import { SessionInfo } from '@/components/sessions/SessionInfo';
+import { ScrollToMessageProvider } from '@/lib/contexts/ScrollToMessageContext';
+import { useSession } from '@/lib/store/hooks';
+import { useStoreContext } from '@/lib/store/provider';
+import { THEME } from '@/lib/theme';
+import { useResponsiveDrawer } from '@/lib/hooks/useResponsiveDrawer';
+import { DrawerActions, useNavigation } from '@react-navigation/native';
+import { Tabs, useLocalSearchParams } from 'expo-router';
+import { FileCode, GitBranch, Menu, MessageSquare } from 'lucide-react-native';
+import { Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useUniwind } from 'uniwind';
+import { useStore } from 'tinybase/ui-react';
+
+function SessionHeader() {
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { isPersistent } = useResponsiveDrawer();
+  const { isReady } = useStoreContext();
+
+  // Get session data from TinyBase store
+  const session = useSession(id ?? '');
+
+  // Determine status text: loading vs not found
+  const getStatusText = () => {
+    if (!isReady) return 'Loading...';
+    if (!session) return 'Session not found';
+    return null;
+  };
+  const statusText = getStatusText();
+
+  return (
+    <View
+      className="border-border bg-background flex-row items-center gap-3 border-b px-4"
+      style={{
+        paddingTop: Math.max(insets.top, 12),
+        paddingBottom: 14,
+      }}>
+      {!isPersistent && (
+        <Pressable
+          onPress={() => navigation.getParent()?.dispatch(DrawerActions.openDrawer())}
+          className="active:bg-accent rounded-lg p-2">
+          <Icon as={Menu} className="text-foreground size-5" />
+        </Pressable>
+      )}
+
+      {session ? (
+        <SessionInfo session={session} context="header" />
+      ) : (
+        <View className="flex-1">
+          <Text className="font-semibold" numberOfLines={1}>
+            {id ? `Session ${id.slice(0, 8)}` : 'Unknown Session'}
+          </Text>
+          <Text className="text-muted-foreground text-xs" numberOfLines={1}>
+            {statusText}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+export default function SessionLayout() {
+  const { theme } = useUniwind();
+  const colors = THEME[theme ?? 'light'];
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const store = useStore();
+
+  // Track active session for real-time artifact updates
+  useEffect(() => {
+    if (store && id) {
+      store.setValue('active_session_id', id);
+      return () => {
+        store.setValue('active_session_id', '');
+      };
+    }
+  }, [store, id]);
+
+  return (
+    <View className="bg-background flex-1">
+      <SessionHeader />
+      <ScrollToMessageProvider>
+        <Tabs
+          screenOptions={{
+            headerShown: false,
+            tabBarHideOnKeyboard: true,
+            tabBarStyle: {
+              backgroundColor: colors.background,
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+              height: 60,
+            },
+            tabBarItemStyle: {
+              paddingVertical: 6,
+            },
+            tabBarActiveTintColor: colors.primary,
+            tabBarInactiveTintColor: colors.mutedForeground,
+          }}>
+          <Tabs.Screen
+            name="chat"
+            options={{
+              title: 'Chat',
+              tabBarIcon: ({ color, size }) => <MessageSquare color={color} size={size} />,
+            }}
+          />
+          <Tabs.Screen
+            name="artifacts"
+            options={{
+              title: 'Artifacts',
+              tabBarIcon: ({ color, size }) => <FileCode color={color} size={size} />,
+            }}
+          />
+          <Tabs.Screen
+            name="changes"
+            options={{
+              title: 'Changes',
+              tabBarIcon: ({ color, size }) => <GitBranch color={color} size={size} />,
+            }}
+          />
+        </Tabs>
+      </ScrollToMessageProvider>
+    </View>
+  );
+}

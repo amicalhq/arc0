@@ -1,0 +1,19 @@
+{
+  "name": "@arc0/types",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./entities": "./src/entities/index.ts",
+    "./claude": "./src/claude/index.ts",
+    "./codex": "./src/codex/index.ts",
+    "./gemini": "./src/gemini/index.ts"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "@arc0/typescript-config": "workspace:*"
+  }
+}

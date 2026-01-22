@@ -1,0 +1,202 @@
+/**
+ * WorkstationList: Displays list of configured workstations for Settings screen.
+ * Shows connection status, allows setting active workstation, and editing.
+ */
+
+import { useState } from 'react';
+import { Pressable, View } from 'react-native';
+import { CheckIcon, PlusIcon, SettingsIcon } from 'lucide-react-native';
+import { useUniwind } from 'uniwind';
+
+import { Icon } from '@/components/ui/icon';
+import { Text } from '@/components/ui/text';
+import { useWorkstations, type WorkstationConfig } from '@/lib/store/hooks';
+import { useSocketContext } from '@/lib/socket/provider';
+import type { ConnectionState } from '@/lib/socket/types';
+import { THEME } from '@/lib/theme';
+import { WorkstationEditModal } from './WorkstationEditModal';
+
+// =============================================================================
+// Types
+// =============================================================================
+
+interface WorkstationListProps {
+  /** Called when a workstation is edited or added */
+  onWorkstationChange?: () => void;
+}
+
+// =============================================================================
+// Connection Status Indicator
+// =============================================================================
+
+function ConnectionIndicator({ state }: { state: ConnectionState }) {
+  const color =
+    state.status === 'connected'
+      ? '#22c55e' // green
+      : state.status === 'connecting'
+        ? '#f59e0b' // amber
+        : '#ef4444'; // red
+
+  return (
+    <View
+      style={{
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: color,
+      }}
+    />
+  );
+}
+
+// =============================================================================
+// Workstation Row
+// =============================================================================
+
+interface WorkstationRowProps {
+  workstation: WorkstationConfig;
+  connectionState: ConnectionState;
+  onSetActive: () => void;
+  onEdit: () => void;
+  isLast: boolean;
+}
+
+function WorkstationRow({
+  workstation,
+  connectionState,
+  onSetActive,
+  onEdit,
+  isLast,
+}: WorkstationRowProps) {
+  const { theme } = useUniwind();
+  const colors = THEME[theme ?? 'light'];
+
+  // Truncate URL for display
+  const displayUrl = workstation.url.replace(/^https?:\/\//, '').slice(0, 30);
+
+  return (
+    <View
+      testID={`workstation-row-${workstation.id}`}
+      className="flex-row items-center px-4 py-3"
+      style={!isLast ? { borderBottomWidth: 1, borderBottomColor: colors.border } : undefined}>
+      {/* Active indicator / Set active button */}
+      <Pressable
+        onPress={onSetActive}
+        disabled={workstation.active}
+        className="mr-3 h-6 w-6 items-center justify-center"
+        hitSlop={8}>
+        {workstation.active ? (
+          <Icon as={CheckIcon} className="text-primary size-5" />
+        ) : (
+          <View className="border-muted-foreground h-5 w-5 rounded-full border-2" />
+        )}
+      </Pressable>
+
+      {/* Workstation info */}
+      <View className="mr-3 flex-1">
+        <Text className="text-foreground font-medium" numberOfLines={1}>
+          {workstation.name}
+        </Text>
+        <Text className="text-muted-foreground text-sm" numberOfLines={1}>
+          {displayUrl}
+        </Text>
+      </View>
+
+      {/* Connection status */}
+      <View className="mr-3">
+        <ConnectionIndicator state={connectionState} />
+      </View>
+
+      {/* Edit button */}
+      <Pressable onPress={onEdit} className="active:bg-accent rounded-lg p-2" hitSlop={8}>
+        <Icon as={SettingsIcon} className="text-muted-foreground size-5" />
+      </Pressable>
+    </View>
+  );
+}
+
+// =============================================================================
+// Main Component
+// =============================================================================
+
+export function WorkstationList({ onWorkstationChange }: WorkstationListProps) {
+  const { theme } = useUniwind();
+  const colors = THEME[theme ?? 'light'];
+  const workstations = useWorkstations();
+  const { allConnectionStates, setActiveWorkstation } = useSocketContext();
+
+  // Modal state
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingWorkstation, setEditingWorkstation] = useState<WorkstationConfig | null>(null);
+
+  const handleSetActive = (workstationId: string) => {
+    setActiveWorkstation(workstationId);
+  };
+
+  const handleEdit = (workstation: WorkstationConfig) => {
+    setEditingWorkstation(workstation);
+    setEditModalVisible(true);
+  };
+
+  const handleAdd = () => {
+    setEditingWorkstation(null);
+    setEditModalVisible(true);
+  };
+
+  const handleModalClose = () => {
+    setEditModalVisible(false);
+    setEditingWorkstation(null);
+    onWorkstationChange?.();
+  };
+
+  return (
+    <View>
+      <Text className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
+        Workstations
+      </Text>
+
+      <View testID="workstation-list" className="bg-card border-border overflow-hidden rounded-lg border">
+        {workstations.length === 0 ? (
+          <View testID="workstation-empty" className="items-center px-4 py-6">
+            <Text className="text-muted-foreground text-center">No workstations configured</Text>
+            <Text className="text-muted-foreground mt-1 text-center text-sm">
+              Add a workstation running Arc0 base service to connect your app
+            </Text>
+          </View>
+        ) : (
+          workstations.map((ws, index) => (
+            <WorkstationRow
+              key={ws.id}
+              workstation={ws}
+              connectionState={allConnectionStates.get(ws.id) ?? { status: 'disconnected' }}
+              onSetActive={() => handleSetActive(ws.id)}
+              onEdit={() => handleEdit(ws)}
+              isLast={index === workstations.length - 1}
+            />
+          ))
+        )}
+
+        {/* Add Workstation button */}
+        <Pressable
+          testID="add-workstation-button"
+          onPress={handleAdd}
+          className="active:bg-accent flex-row items-center gap-3 px-4 py-3"
+          style={
+            workstations.length > 0
+              ? { borderTopWidth: 1, borderTopColor: colors.border }
+              : undefined
+          }>
+          <Icon as={PlusIcon} className="text-primary size-5" />
+          <Text className="text-primary font-medium">Add Workstation</Text>
+        </Pressable>
+      </View>
+
+      {/* Edit Modal */}
+      <WorkstationEditModal
+        visible={editModalVisible}
+        workstation={editingWorkstation}
+        onClose={handleModalClose}
+      />
+    </View>
+  );
+}

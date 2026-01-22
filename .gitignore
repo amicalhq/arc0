@@ -45,6 +45,18 @@ coverage
 .playwright-mcp
 .test-results
 
+# Expo / React Native
+.expo/
+ios/
+android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
 # Misc
 *.tgz
 .cache
