@@ -1,6 +1,6 @@
 {
   "name": "@arc0/native",
-  "main": "expo-router/entry",
+  "main": "./index.js",
   "version": "0.1.0",
   "scripts": {
     "postinstall": "./scripts/patch-expect-webdriverio.sh",
