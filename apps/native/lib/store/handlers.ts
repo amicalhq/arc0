@@ -476,10 +476,19 @@ function applySessionNameUpdates(store: Store, updates: SessionNameUpdate[]): vo
  * Analyzes assistant messages to determine current session state.
  */
 function updateSessionStatus(store: Store, rawEnvelopes: RawMessageEnvelope[]): void {
-  // Group envelopes by session and find the last one for each
+  // Group envelopes by session and find the last user/assistant message for each
   const lastEnvelopeBySession = new Map<string, RawMessageEnvelope>();
 
   for (const envelope of rawEnvelopes) {
+    const payload = envelope.payload as Record<string, unknown>;
+    const msgType = payload.type as string | undefined;
+
+    // Only consider user/assistant messages for status computation
+    // (skip summary, queue-operation, file-history-snapshot, etc.)
+    if (msgType !== 'user' && msgType !== 'assistant') {
+      continue;
+    }
+
     const existing = lastEnvelopeBySession.get(envelope.sessionId);
     if (!existing) {
       lastEnvelopeBySession.set(envelope.sessionId, envelope);
@@ -496,12 +505,7 @@ function updateSessionStatus(store: Store, rawEnvelopes: RawMessageEnvelope[]): 
   store.transaction(() => {
     for (const [sessionId, envelope] of lastEnvelopeBySession) {
       const payload = envelope.payload as Record<string, unknown>;
-
-      // Only process user/assistant messages (not summary, queue-operation, etc.)
-      const msgType = payload.type as string | undefined;
-      if (msgType !== 'user' && msgType !== 'assistant') {
-        continue;
-      }
+      const msgType = payload.type as string;
 
       // Check if session is open
       const session = store.getRow('sessions', sessionId);
