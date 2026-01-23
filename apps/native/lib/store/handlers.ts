@@ -135,7 +135,7 @@ export async function handleSessionsSync(
     for (const [id, session] of Object.entries(allSessions)) {
       if (
         session.workstation_id === workstationId &&
-        session.open === 1 &&
+        Number(session.open) === 1 &&
         !sessionIds.has(id)
       ) {
         store.setPartialRow('sessions', id, {
@@ -215,7 +215,7 @@ function countClosedSessions(
   for (const [id, session] of Object.entries(allSessions)) {
     if (
       session.workstation_id === workstationId &&
-      session.open === 1 &&
+      Number(session.open) === 1 &&
       !openSessionIds.has(id)
     ) {
       count++;
@@ -505,7 +505,7 @@ function updateSessionStatus(store: Store, rawEnvelopes: RawMessageEnvelope[]): 
 
       // Check if session is open
       const session = store.getRow('sessions', sessionId);
-      const isOpen = session?.open === 1;
+      const isOpen = Number(session?.open) === 1;
 
       // Parse content blocks
       let contentBlocks: ContentBlock[] = [];

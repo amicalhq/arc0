@@ -219,7 +219,7 @@ export function useOpenSessions(): Session[] {
     const sessions = Object.entries(sessionsTable)
       .filter(([_, row]) => {
         // Filter by open status
-        if (row.open !== 1) return false;
+        if (Number(row.open) !== 1) return false;
         // Filter by active workstation (if any workstations exist)
         if (activeWorkstationId && row.workstation_id !== activeWorkstationId) {
           return false;
@@ -270,7 +270,7 @@ export function useClosedSessions(): Session[] {
     const sessions = Object.entries(sessionsTable)
       .filter(([_, row]) => {
         // Filter by closed status
-        if (row.open !== 0) return false;
+        if (Number(row.open) !== 0) return false;
         // Filter by active workstation (if any workstations exist)
         if (activeWorkstationId && row.workstation_id !== activeWorkstationId) {
           return false;
@@ -416,7 +416,7 @@ export function useMessageIds(sessionId: string): UseMessageIdsResult {
       const hasAttempted = attemptedLoadRef.current.has(sessionId);
       if (
         session &&
-        session.open === 0 &&
+        Number(session.open) === 0 &&
         messageIds.length === 0 &&
         store &&
         indexes &&
@@ -448,7 +448,7 @@ export function useMessageIds(sessionId: string): UseMessageIdsResult {
     const wasLoadedByFirstEffect = attemptedLoadRef.current.has(sessionId);
     if (
       !wasLoadedByFirstEffect &&
-      session?.open === 0 &&
+      Number(session?.open) === 0 &&
       messageIds.length > 0 &&
       store &&
       indexes
