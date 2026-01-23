@@ -1,5 +1,5 @@
 # Dependencies
-node_modules
+node_modules/
 .pnp
 .pnp.js
 
@@ -14,7 +14,7 @@ build
 .envrc
 
 # IDEs and editors
-.vscode/*
+.vscode/
 .idea
 *.swp
 *.swo
@@ -53,6 +53,14 @@ android/
 *.mobileprovision
 *.orig.*
 web-build/
+
+# AI tools
+.claude/
+agents/
+codex/
+gemini/
+claude.md
+agents.md
 
 # Misc
 *.tgz
