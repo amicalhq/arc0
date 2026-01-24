@@ -121,7 +121,6 @@ export function SessionList({
       renderItem={renderItem}
       keyExtractor={keyExtractor}
       getItemType={getItemType}
-      contentContainerStyle={{ paddingVertical: 4 }}
     />
   );
 }

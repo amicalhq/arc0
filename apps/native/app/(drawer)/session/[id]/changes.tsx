@@ -10,8 +10,7 @@ import {
   GitCompareIcon,
 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, View } from 'react-native';
-import { useResponsiveDrawer } from '@/lib/hooks/useResponsiveDrawer';
+import { Pressable, ScrollView, View } from 'react-native';
 
 // Mock data for development - showcases file type icons
 const MOCK_CHANGES: FileChangeItem[] = [
@@ -249,7 +248,6 @@ export default function ChangesScreen() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [allExpanded, setAllExpanded] = useState(false);
   const [overlayDismissed, setOverlayDismissed] = useState(false);
-  const { isPersistent } = useResponsiveDrawer();
 
   // Using mock data for now
   const changes = MOCK_CHANGES;
@@ -323,8 +321,6 @@ export default function ChangesScreen() {
           contentContainerStyle={{
             paddingHorizontal: 16,
             paddingBottom: 16,
-            // On web with persistent drawer, adjust padding for scrollbar
-            ...(isPersistent && Platform.OS === 'web' && { paddingLeft: 20, paddingRight: 0 }),
           }}
           showsVerticalScrollIndicator={false}>
           {/* Staged Changes */}

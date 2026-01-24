@@ -9,8 +9,7 @@ import { useScrollToMessageSafe } from '@/lib/contexts/ScrollToMessageContext';
 import { deriveToolState, isNonInteractiveTool, type ToolResultWithMetadata } from '@/lib/utils/tool-state';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Platform, View } from 'react-native';
-import { useResponsiveDrawer } from '@/lib/hooks/useResponsiveDrawer';
+import { View } from 'react-native';
 import { AssistantMessage } from './AssistantMessage';
 import { ImageBlockDisplay } from './ImageBlockDisplay';
 import { SystemMessage } from './SystemMessage';
@@ -143,7 +142,6 @@ function ItemSeparator() {
 export function MessageList({ messages }: MessageListProps) {
   const listRef = useRef<FlashListRef<RenderableMessage>>(null);
   const scrollContext = useScrollToMessageSafe();
-  const { isPersistent } = useResponsiveDrawer();
 
   // Build a map of tool_use_id -> tool_result with metadata for pairing
   const toolResults = useMemo(() => {
@@ -228,11 +226,7 @@ export function MessageList({ messages }: MessageListProps) {
       )}
       keyExtractor={getMessageKey}
       ItemSeparatorComponent={ItemSeparator}
-      contentContainerStyle={{
-        paddingVertical: 8,
-        // On web with persistent drawer, adjust padding for scrollbar
-        ...(isPersistent && Platform.OS === 'web' && { paddingLeft: 4, paddingRight: 0 }),
-      }}
+      contentContainerStyle={{ paddingVertical: 8 }}
       maintainVisibleContentPosition={{
         startRenderingFromBottom: true,
         autoscrollToBottomThreshold: 0.2,

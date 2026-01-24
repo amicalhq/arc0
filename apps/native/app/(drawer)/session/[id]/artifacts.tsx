@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, View } from 'react-native';
-import { useResponsiveDrawer } from '@/lib/hooks/useResponsiveDrawer';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ExternalLinkIcon, FileCodeIcon, PickaxeIcon, MapIcon } from 'lucide-react-native';
 import { useIndexes, useStore } from 'tinybase/ui-react';
@@ -22,7 +21,6 @@ export default function ArtifactsScreen() {
   const { requestScrollToMessage } = useScrollToMessage();
   const { data: artifacts, isLoading } = useArtifacts(id || '');
   const [selectedType, setSelectedType] = useState<ArtifactType | null>(null);
-  const { isPersistent } = useResponsiveDrawer();
 
   // Memory cleanup: unload artifacts when navigating away from this session
   useEffect(() => {
@@ -81,8 +79,6 @@ export default function ArtifactsScreen() {
         contentContainerStyle={{
           padding: 16,
           paddingBottom: 80,
-          // On web with persistent drawer, adjust padding for scrollbar
-          ...(isPersistent && Platform.OS === 'web' && { paddingLeft: 20, paddingRight: 0 }),
         }}>
         {activeType === 'todo' && artifacts.todos.length > 0 && (
           <View className="rounded-sm border border-border p-4">
