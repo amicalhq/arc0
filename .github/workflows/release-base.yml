@@ -47,6 +47,8 @@ jobs:
 
       - name: Compile binaries for all platforms
         run: pnpm --filter @arc0/base compile:all
+        env:
+          NODE_ENV: production
 
       - name: Generate checksums
         working-directory: apps/base/dist
