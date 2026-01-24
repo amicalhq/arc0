@@ -2,9 +2,7 @@ import { Text } from '@/components/ui/text';
 import { Card } from '@/components/ui/card';
 import type { Session } from '@/lib/types/session';
 import { useRouter } from 'expo-router';
-import { Platform, Pressable, View } from 'react-native';
-import { useResponsiveDrawer } from '@/lib/hooks/useResponsiveDrawer';
-import { cn } from '@/lib/utils';
+import { Pressable, View } from 'react-native';
 import { formatRelativeTimeShort } from '@/lib/utils/time';
 import { SessionInfo } from './SessionInfo';
 import { SessionStatusBadge } from './SessionStatusBadge';
@@ -23,8 +21,6 @@ export function SessionCard({ session, isSelected = false, onPress }: SessionCar
   const { theme } = useUniwind();
   const colors = THEME[theme ?? 'light'];
   const statusInfo = useEffectiveSessionStatus(session);
-  const { isPersistent } = useResponsiveDrawer();
-  const isWebPersistent = isPersistent && Platform.OS === 'web';
 
   const handlePress = () => {
     onPress?.();
@@ -39,10 +35,7 @@ export function SessionCard({ session, isSelected = false, onPress }: SessionCar
   return (
     <Pressable testID={`session-card-${session.id}`} onPress={handlePress} className="active:opacity-80">
       <Card
-        className={cn(
-          'mb-2 gap-0 rounded-sm py-0',
-          isWebPersistent ? 'ml-2 mr-0' : 'mx-2'
-        )}
+        className="mx-2 mb-2 gap-0 rounded-sm py-0"
         style={isSelected ? { borderColor: colors.primary } : undefined}>
         {/* Card content */}
         <View className="p-3">

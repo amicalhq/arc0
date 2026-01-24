@@ -2,8 +2,7 @@ import { FlashList } from '@shopify/flash-list';
 import { Text } from '@/components/ui/text';
 import { SessionCard } from './SessionCard';
 import type { Session } from '@/lib/types/session';
-import { Platform, View, Pressable } from 'react-native';
-import { useResponsiveDrawer } from '@/lib/hooks/useResponsiveDrawer';
+import { View, Pressable } from 'react-native';
 import { ChevronDown, ChevronRight } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 import { useState, useMemo } from 'react';
@@ -26,7 +25,6 @@ export function SessionList({
   onSessionPress,
 }: SessionListProps) {
   const [historicalExpanded, setHistoricalExpanded] = useState(false);
-  const { isPersistent } = useResponsiveDrawer();
 
   const data = useMemo(() => {
     const items: ListItem[] = [];
@@ -123,7 +121,7 @@ export function SessionList({
       renderItem={renderItem}
       keyExtractor={keyExtractor}
       getItemType={getItemType}
-      contentContainerStyle={isPersistent && Platform.OS === 'web' ? { paddingLeft: 4 } : undefined}
+      contentContainerStyle={{ paddingVertical: 4 }}
     />
   );
 }
