@@ -105,7 +105,7 @@ export class FrpcManager {
     // Regenerate frpc.toml to ensure it uses env var for port
     const subdomain = this.config.tunnel?.subdomain;
     if (subdomain) {
-      const configContent = generateFrpcConfig(subdomain);
+      const configContent = generateFrpcConfig(subdomain, this.config.workstationId);
       writeFileSync(FRPC_CONFIG, configContent, { mode: 0o600 });
       console.log(`[frpc] Regenerated config for subdomain: ${subdomain}`);
     }

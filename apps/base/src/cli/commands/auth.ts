@@ -120,7 +120,7 @@ async function loginSubcommand(): Promise<void> {
     }
 
     // Generate frpc.toml
-    const frpcToml = generateFrpcConfig(subdomain);
+    const frpcToml = generateFrpcConfig(subdomain, config.workstationId);
     writeFileSync(FRPC_CONFIG, frpcToml, { mode: 0o600 });
 
     const tunnelUrl = `https://${subdomain}.${TUNNEL_DOMAIN}`;
