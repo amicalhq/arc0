@@ -28,12 +28,14 @@
     "open": "^10.2.0",
     "picocolors": "^1.1.1",
     "proper-lockfile": "^4.1.2",
+    "qrcode": "^1.5.4",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",
     "@types/proper-lockfile": "^4.1.4",
+    "@types/qrcode": "^1.5.6",
     "tsup": "^8.5.0",
     "tsx": "^4.19.4",
     "typescript": "catalog:"

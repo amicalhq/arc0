@@ -7,6 +7,7 @@
 
 import * as p from "@clack/prompts";
 import pc from "picocolors";
+import QRCode from "qrcode";
 import { isDaemonLocked } from "../../shared/lock.js";
 import { readDaemonState } from "../../shared/pid.js";
 import { TUNNEL_DOMAIN, loadConfig } from "../../shared/config.js";
@@ -28,7 +29,7 @@ interface PairingStatusResponse {
 async function fetchDaemonApi<T>(
   port: number,
   endpoint: string,
-  options?: RequestInit
+  options?: RequestInit,
 ): Promise<T | null> {
   try {
     const controller = new AbortController();
@@ -69,7 +70,7 @@ export async function pairCommand(): Promise<void> {
   const result = await fetchDaemonApi<PairingStartResponse>(
     controlPort,
     "/api/pairing/start",
-    { method: "POST" }
+    { method: "POST" },
   );
 
   if (!result) {
@@ -89,21 +90,40 @@ export async function pairCommand(): Promise<void> {
 
   // Build connect URL if tunnel is configured
   const connectUrl = tunnelUrl
-    ? `https://arc0.ai/connect?url=${encodeURIComponent(tunnelUrl)}&code=${result.formattedCode.replace(/-/g, '')}`
+    ? `https://arc0.ai/connect?url=${encodeURIComponent(tunnelUrl)}&code=${result.formattedCode.replace(/-/g, "")}`
     : null;
 
-  // Display the pairing code
-  const noteContent = connectUrl
-    ? `${pc.bold(pc.cyan(result.formattedCode))}\n\n` +
-      `${pc.bold("Connect URL:")}\n${pc.cyan(connectUrl)}\n\n` +
-      `Or enter the code manually in the Arc0 app:\n${pc.bold("Add Workstation")} → ${pc.bold("Enter Pairing Code")}`
-    : `${pc.bold(pc.cyan(result.formattedCode))}\n\nEnter this code in the Arc0 app:\n${pc.bold("Add Workstation")} → ${pc.bold("Enter Pairing Code")}`;
+  // Generate QR code if connect URL is available
+  let qrCode = "";
+  if (connectUrl) {
+    try {
+      qrCode = await QRCode.toString(connectUrl, {
+        type: "terminal",
+        small: true,
+        errorCorrectionLevel: "L",
+      });
+    } catch {
+      // QR generation failed, continue without it
+    }
+  }
 
-  p.note(noteContent, "Pairing Code");
+  // Display the pairing info
+  const noteContent = connectUrl
+    ? (qrCode ? `${qrCode}\n` : "") +
+      `Visit this URL to connect quickly:\n${pc.bold(pc.magenta(connectUrl))}\n\n` +
+      `Or enter the code manually in the Arc0 app:\n${pc.bold("Add Workstation")} → ${pc.bold("Enter Pairing Code")}\n\n` +
+      `${pc.bold("Pairing Code:")} ${pc.cyan(result.formattedCode)}\n` +
+      `${pc.bold("Workstation URL:")} ${pc.cyan(tunnelUrl)}`
+    : `${pc.bold("Pairing Code:")}\n${pc.cyan(result.formattedCode)}\n\n` +
+      `Enter this code in the Arc0 app:\n${pc.bold("Add Workstation")} → ${pc.bold("Enter Pairing Code")}`;
+
+  p.note(noteContent, "Connect Your Device");
 
   // Poll for completion
   const pollS = p.spinner();
-  pollS.start(`Waiting for device to connect... (expires in ${Math.floor(result.expiresIn / 1000)}s)`);
+  pollS.start(
+    `Waiting for device to connect... (expires in ${Math.floor(result.expiresIn / 1000)}s)`,
+  );
 
   let attempts = 0;
   const maxAttempts = Math.ceil(result.expiresIn / 2000); // Poll every 2 seconds
@@ -114,7 +134,7 @@ export async function pairCommand(): Promise<void> {
 
     const status = await fetchDaemonApi<PairingStatusResponse>(
       controlPort,
-      "/api/pairing/status"
+      "/api/pairing/status",
     );
 
     if (!status) {
@@ -125,11 +145,11 @@ export async function pairCommand(): Promise<void> {
     if (status.completed) {
       pollS.stop("Device connected!");
       p.log.success(
-        `Paired with ${pc.cyan(status.deviceName ?? "Unknown Device")}`
+        `Paired with ${pc.cyan(status.deviceName ?? "Unknown Device")}`,
       );
       p.note(
         `Device ID: ${status.deviceId}\n\nThe device can now connect securely to this workstation.`,
-        "Pairing Complete"
+        "Pairing Complete",
       );
       return;
     }
@@ -142,7 +162,9 @@ export async function pairCommand(): Promise<void> {
 
     const remaining = Math.floor((status.remainingMs ?? 0) / 1000);
     if (remaining > 0 && remaining % 30 === 0) {
-      pollS.message(`Waiting for device to connect... (${remaining}s remaining)`);
+      pollS.message(
+        `Waiting for device to connect... (${remaining}s remaining)`,
+      );
     }
   }
 
