@@ -60,7 +60,7 @@ export function StoreProvider({ children }: StoreProviderProps) {
         artifacts: {},
       })
       .setValues({
-        theme: 'light', // Will be updated from persisted value
+        theme: 'system', // Will be updated from persisted value
         device: '', // Will be set after load if empty
         closed_session_access_order: '[]', // JSON array of recently accessed closed session IDs (LRU order)
         active_session_id: '', // Currently viewed session ID (for real-time artifact updates)
@@ -146,7 +146,7 @@ export function StoreProvider({ children }: StoreProviderProps) {
           artifacts: {},
         });
         store.setValues({
-          theme: 'light',
+          theme: 'system',
           device: '',
           closed_session_access_order: '[]',
           active_session_id: '',
