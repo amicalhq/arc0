@@ -59,17 +59,8 @@ function RootStack({ theme }: { theme: 'light' | 'dark' | undefined }) {
         name="settings"
         options={{
           presentation: 'modal',
-          headerShown: true,
-          title: 'Settings',
-          headerStyle: { backgroundColor: colors.background },
+          headerShown: false,
           contentStyle: { backgroundColor: colors.background },
-          headerBackVisible: false,
-          headerLeft: () => null,
-          headerRight: () => (
-            <Pressable onPress={handleModalClose} className="p-2">
-              <XIcon size={20} color={colors.mutedForeground} />
-            </Pressable>
-          ),
         }}
       />
       <Stack.Screen

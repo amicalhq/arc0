@@ -93,6 +93,10 @@ interface WorkstationEditModalProps {
   /** Workstation to edit, or null to add a new one */
   workstation: WorkstationConfig | null;
   onClose: () => void;
+  /** Pre-filled URL for deep link pairing */
+  initialUrl?: string;
+  /** Pre-filled pairing code for deep link pairing */
+  initialCode?: string;
 }
 
 // =============================================================================
@@ -153,6 +157,8 @@ export function WorkstationEditModal({
   visible,
   workstation,
   onClose,
+  initialUrl,
+  initialCode,
 }: WorkstationEditModalProps) {
   const { theme } = useUniwind();
   const colors = THEME[theme ?? 'light'];
@@ -221,7 +227,7 @@ export function WorkstationEditModal({
     return url.trim() !== '';
   })();
 
-  // Load existing workstation data when editing
+  // Load existing workstation data when editing, or pre-fill from deep link params
   useEffect(() => {
     if (visible) {
       resetPairing();
@@ -233,14 +239,14 @@ export function WorkstationEditModal({
         setEnabled(workstation.enabled);
         setPairingCode('');
       } else {
-        // Reset form for new workstation
+        // Reset form for new workstation, or pre-fill from deep link params
         setName('');
-        setUrl('');
-        setPairingCode('');
+        setUrl(initialUrl ?? '');
+        setPairingCode(initialCode ? formatPairingCode(initialCode) : '');
         setEnabled(true);
       }
     }
-  }, [visible, workstation, resetPairing]);
+  }, [visible, workstation, resetPairing, initialUrl, initialCode]);
 
   // Reset pairing when URL or code changes
   useEffect(() => {

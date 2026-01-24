@@ -18,7 +18,8 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.amical.arc0"
+      "bundleIdentifier": "ai.amical.arc0",
+      "associatedDomains": ["applinks:arc0.ai", "applinks:www.arc0.ai"]
     },
     "android": {
       "edgeToEdgeEnabled": true,
@@ -27,7 +28,18 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.amical.arc0"
+      "package": "ai.amical.arc0",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "arc0.ai", "pathPrefix": "/connect" },
+            { "scheme": "https", "host": "www.arc0.ai", "pathPrefix": "/connect" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",

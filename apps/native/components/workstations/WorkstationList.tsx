@@ -3,7 +3,7 @@
  * Shows connection status, allows setting active workstation, and editing.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { CheckIcon, PlusIcon, SettingsIcon } from 'lucide-react-native';
 import { useUniwind } from 'uniwind';
@@ -23,6 +23,14 @@ import { WorkstationEditModal } from './WorkstationEditModal';
 interface WorkstationListProps {
   /** Called when a workstation is edited or added */
   onWorkstationChange?: () => void;
+  /** Whether to open the add workstation modal (controlled by URL param) */
+  openModal?: boolean;
+  /** Pre-filled URL for pairing */
+  initialUrl?: string;
+  /** Pre-filled pairing code for pairing */
+  initialCode?: string;
+  /** Called when URL params are consumed */
+  onParamsConsumed?: () => void;
 }
 
 // =============================================================================
@@ -119,7 +127,13 @@ function WorkstationRow({
 // Main Component
 // =============================================================================
 
-export function WorkstationList({ onWorkstationChange }: WorkstationListProps) {
+export function WorkstationList({
+  onWorkstationChange,
+  openModal,
+  initialUrl,
+  initialCode,
+  onParamsConsumed,
+}: WorkstationListProps) {
   const { theme } = useUniwind();
   const colors = THEME[theme ?? 'light'];
   const workstations = useWorkstations();
@@ -128,6 +142,30 @@ export function WorkstationList({ onWorkstationChange }: WorkstationListProps) {
   // Modal state
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingWorkstation, setEditingWorkstation] = useState<WorkstationConfig | null>(null);
+  const [modalUrl, setModalUrl] = useState<string | undefined>(undefined);
+  const [modalCode, setModalCode] = useState<string | undefined>(undefined);
+
+  // Track if params have been consumed
+  const paramsConsumedRef = useRef(false);
+
+  // Reset consumed ref when openModal becomes false (allows re-triggering on subsequent navigations)
+  useEffect(() => {
+    if (!openModal) {
+      paramsConsumedRef.current = false;
+    }
+  }, [openModal]);
+
+  // Auto-open modal when openModal prop is true
+  useEffect(() => {
+    if (openModal && !paramsConsumedRef.current) {
+      paramsConsumedRef.current = true;
+      setModalUrl(initialUrl);
+      setModalCode(initialCode);
+      setEditingWorkstation(null);
+      setEditModalVisible(true);
+      onParamsConsumed?.();
+    }
+  }, [openModal, initialUrl, initialCode, onParamsConsumed]);
 
   const handleSetActive = (workstationId: string) => {
     setActiveWorkstation(workstationId);
@@ -140,12 +178,16 @@ export function WorkstationList({ onWorkstationChange }: WorkstationListProps) {
 
   const handleAdd = () => {
     setEditingWorkstation(null);
+    setModalUrl(undefined);
+    setModalCode(undefined);
     setEditModalVisible(true);
   };
 
   const handleModalClose = () => {
     setEditModalVisible(false);
     setEditingWorkstation(null);
+    setModalUrl(undefined);
+    setModalCode(undefined);
     onWorkstationChange?.();
   };
 
@@ -196,6 +238,8 @@ export function WorkstationList({ onWorkstationChange }: WorkstationListProps) {
         visible={editModalVisible}
         workstation={editingWorkstation}
         onClose={handleModalClose}
+        initialUrl={modalUrl}
+        initialCode={modalCode}
       />
     </View>
   );

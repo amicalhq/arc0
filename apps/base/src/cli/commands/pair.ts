@@ -87,9 +87,16 @@ export async function pairCommand(): Promise<void> {
       ? `https://${config.tunnel.subdomain}.${TUNNEL_DOMAIN}`
       : null;
 
+  // Build connect URL if tunnel is configured
+  const connectUrl = tunnelUrl
+    ? `https://arc0.ai/connect?url=${encodeURIComponent(tunnelUrl)}&code=${result.formattedCode.replace(/-/g, '')}`
+    : null;
+
   // Display the pairing code
-  const noteContent = tunnelUrl
-    ? `${pc.bold(pc.cyan(result.formattedCode))}\n\nTunnel: ${pc.cyan(tunnelUrl)}\n\nEnter this code in the Arc0 app:\n${pc.bold("Add Workstation")} → ${pc.bold("Enter Pairing Code")}`
+  const noteContent = connectUrl
+    ? `${pc.bold(pc.cyan(result.formattedCode))}\n\n` +
+      `${pc.bold("Connect URL:")}\n${pc.cyan(connectUrl)}\n\n` +
+      `Or enter the code manually in the Arc0 app:\n${pc.bold("Add Workstation")} → ${pc.bold("Enter Pairing Code")}`
     : `${pc.bold(pc.cyan(result.formattedCode))}\n\nEnter this code in the Arc0 app:\n${pc.bold("Add Workstation")} → ${pc.bold("Enter Pairing Code")}`;
 
   p.note(noteContent, "Pairing Code");

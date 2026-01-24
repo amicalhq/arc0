@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Pressable,
@@ -7,6 +7,7 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Text } from '@/components/ui/text';
 import { Icon } from '@/components/ui/icon';
 import {
@@ -23,7 +24,6 @@ import {
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUniwind } from 'uniwind';
-import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import { useStore } from 'tinybase/ui-react';
 import { THEME } from '@/lib/theme';
@@ -47,6 +47,32 @@ export default function SettingsScreen() {
   const store = useStore();
   const { db } = useStoreContext();
   const { disconnectAll } = useSocketContext();
+
+  // URL params for modal control and deep link pairing
+  const params = useLocalSearchParams<{ modal?: string; url?: string; code?: string }>();
+  const [openModal, setOpenModal] = useState<string | undefined>(undefined);
+  const [modalUrl, setModalUrl] = useState<string | undefined>(undefined);
+  const [modalCode, setModalCode] = useState<string | undefined>(undefined);
+  const paramsConsumedRef = useRef(false);
+
+  // Capture URL params on mount
+  useEffect(() => {
+    if (params.modal && !paramsConsumedRef.current) {
+      paramsConsumedRef.current = true;
+      setOpenModal(params.modal);
+      setModalUrl(params.url);
+      setModalCode(params.code);
+    }
+  }, [params.modal, params.url, params.code]);
+
+  // Clear URL params after consumed
+  const handleParamsConsumed = useCallback(() => {
+    setOpenModal(undefined);
+    setModalUrl(undefined);
+    setModalCode(undefined);
+    // Clear URL params
+    router.setParams({ modal: undefined, url: undefined, code: undefined });
+  }, [router]);
 
   const currentTheme: ThemePreference = themePreference ?? 'light';
 
@@ -175,7 +201,12 @@ export default function SettingsScreen() {
       <ScrollView className="flex-1 p-4">
         {/* Workstations Section */}
         <View className="mb-6">
-          <WorkstationList />
+          <WorkstationList
+            openModal={openModal === 'add-workstation'}
+            initialUrl={modalUrl}
+            initialCode={modalCode}
+            onParamsConsumed={handleParamsConsumed}
+          />
         </View>
 
         {/* Reset App (moved outside workstations card) */}

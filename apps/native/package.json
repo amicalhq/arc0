@@ -14,6 +14,8 @@
     "install:android": "adb devices | tail -n +2 | cut -sf 1 | xargs -I {} adb -s {} install android/app/build/outputs/apk/debug/app-debug.apk",
     "install:android:release": "adb devices | tail -n +2 | cut -sf 1 | xargs -I {} adb -s {} install android/app/build/outputs/apk/release/app-release.apk",
     "install:ios": "APP=$(find ~/Library/Developer/Xcode/DerivedData -name 'Arc0.app' -path '*Debug-iphonesimulator*' -type d -print -quit) && xcrun simctl list devices | grep -oE '[A-F0-9-]{36}.*Booted' | grep -oE '[A-F0-9-]{36}' | xargs -I {} xcrun simctl install {} \"$APP\"",
+    "deeplink:ios": "xcrun simctl openurl booted 'arc0://connect?url=https%3A%2F%2Ftest.t.arc0.ai&code=ABCD1234'",
+    "deeplink:android": "adb shell \"am start -a android.intent.action.VIEW -d 'arc0://connect?url=https%3A%2F%2Ftest.t.arc0.ai&code=ABCD1234'\"",
     "clean": "rm -rf .expo node_modules",
     "lint": "expo lint && npx expo-doctor",
     "lint:fix": "expo lint --fix",
