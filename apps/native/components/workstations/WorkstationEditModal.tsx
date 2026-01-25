@@ -316,14 +316,18 @@ export function WorkstationEditModal({
           return;
         }
 
+        // Capture pairing data before resetting (to prevent brief error flash)
+        const { workstationId, workstationName, authToken, encryptionKey } = pairingResult;
+        resetPairing();
+
         // Add new workstation with credentials from pairing
-        const workstationName = name.trim() || pairingResult.workstationName || `Workstation ${pairingResult.workstationId.slice(0, 8)}`;
+        const workstationNameFinal = name.trim() || workstationName || `Workstation ${workstationId.slice(0, 8)}`;
         await addWorkstation(
-          pairingResult.workstationId,
-          workstationName,
+          workstationId,
+          workstationNameFinal,
           url.trim(),
-          pairingResult.authToken,
-          pairingResult.encryptionKey
+          authToken,
+          encryptionKey
         );
       }
 
@@ -344,6 +348,7 @@ export function WorkstationEditModal({
     updateWorkstation,
     workstationsTable,
     onClose,
+    resetPairing,
   ]);
 
   const handleDelete = useCallback(() => {
