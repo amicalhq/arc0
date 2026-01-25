@@ -19,7 +19,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ai.amical.arc0",
-      "associatedDomains": ["applinks:arc0.ai", "applinks:www.arc0.ai"]
+      "associatedDomains": ["applinks:arc0.ai", "applinks:www.arc0.ai"],
+      "appleTeamId": "59CRJ9SJ4N"
     },
     "android": {
       "edgeToEdgeEnabled": true,
