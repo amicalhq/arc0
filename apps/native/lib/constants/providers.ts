@@ -8,6 +8,7 @@ import KiloCodeIconDark from '@/assets/images/kilo_code_icon_dark.svg';
 import KiloCodeIconLight from '@/assets/images/kilo_code_icon_light.svg';
 import OpenAIIconDark from '@/assets/images/openai_icon_dark.svg';
 import OpenAIIconLight from '@/assets/images/openai_icon_light.svg';
+import OpenCodeIcon from '@/assets/images/opencode.svg';
 
 export type ProviderAsset = {
   Icon: React.FC<SvgProps>;
@@ -16,7 +17,7 @@ export type ProviderAsset = {
 };
 
 export const PROVIDER_ASSETS: Record<string, ProviderAsset> = {
-  'claude-code': {
+  claude: {
     Icon: ClaudeIcon,
     color: '#E87443',
   },
@@ -25,7 +26,7 @@ export const PROVIDER_ASSETS: Record<string, ProviderAsset> = {
     IconDark: OpenAIIconDark,
     color: '#6B7280',
   },
-  'gemini-cli': {
+  gemini: {
     Icon: GeminiIcon,
     color: '#4285F4',
   },
@@ -34,9 +35,13 @@ export const PROVIDER_ASSETS: Record<string, ProviderAsset> = {
     IconDark: CursorIconDark,
     color: '#6B7280',
   },
-  'kilo-code': {
+  kilo: {
     Icon: KiloCodeIconLight,
     IconDark: KiloCodeIconDark,
+    color: '#6B7280',
+  },
+  opencode: {
+    Icon: OpenCodeIcon,
     color: '#6B7280',
   },
 };
