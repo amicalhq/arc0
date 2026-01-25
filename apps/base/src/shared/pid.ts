@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, unlinkSync, existsSync, mkdirSync } from "node:fs";
-import { PID_FILE, STATE_FILE, CONFIG_DIR, type DaemonState } from "./config.js";
+import { PID_FILE, STATE_FILE, CONFIG_DIR, CONFIG_FILE, type DaemonState, type PortPreferences, type Arc0Config } from "./config.js";
 
 export function writePid(pid: number): void {
   if (!existsSync(CONFIG_DIR)) {
@@ -63,5 +63,32 @@ export function isDaemonRunning(): boolean {
     removePid();
     removeDaemonState();
     return false;
+  }
+}
+
+export function getPreferredPorts(): PortPreferences | null {
+  try {
+    const content = readFileSync(CONFIG_FILE, "utf-8");
+    const config = JSON.parse(content) as Arc0Config;
+    return config.portPreferences ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function savePreferredPorts(controlPort: number, socketPort: number): void {
+  try {
+    let config: Arc0Config;
+    try {
+      const content = readFileSync(CONFIG_FILE, "utf-8");
+      config = JSON.parse(content) as Arc0Config;
+    } catch {
+      // Config file doesn't exist or is invalid, skip saving
+      return;
+    }
+    config.portPreferences = { controlPort, socketPort };
+    writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  } catch {
+    // Ignore errors when saving port preferences
   }
 }

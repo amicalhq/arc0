@@ -45,6 +45,7 @@ export interface ServerStatus {
 // =============================================================================
 
 export interface ControlServerOptions {
+  preferredPort?: number;
   onReady?: (port: number) => void;
 }
 
@@ -72,15 +73,31 @@ export class ControlServer {
       };
     });
 
-    // Bind to localhost only (port 0 = OS picks)
-    this.httpServer.listen(0, "127.0.0.1", () => {
-      const addr = this.httpServer.address();
-      if (addr && typeof addr === "object") {
-        this._port = addr.port;
-        console.log(`[control] Listening on 127.0.0.1:${this._port}`);
-        options.onReady?.(this._port);
-      }
-    });
+    const startListening = (port: number) => {
+      this.httpServer.listen(port, "127.0.0.1", () => {
+        const addr = this.httpServer.address();
+        if (addr && typeof addr === "object") {
+          this._port = addr.port;
+          console.log(`[control] Listening on 127.0.0.1:${this._port}`);
+          options.onReady?.(this._port);
+        }
+      });
+    };
+
+    // Try preferred port first, fall back to OS-assigned port on conflict
+    if (options.preferredPort && options.preferredPort > 0) {
+      this.httpServer.once("error", (err: NodeJS.ErrnoException) => {
+        if (err.code === "EADDRINUSE") {
+          console.log(`[control] Preferred port ${options.preferredPort} in use, falling back to OS-assigned`);
+          startListening(0);
+        } else {
+          throw err;
+        }
+      });
+      startListening(options.preferredPort);
+    } else {
+      startListening(0);
+    }
   }
 
   get port(): number {
@@ -225,6 +242,7 @@ export interface SocketServerOptions {
   onConnect?: () => void;
   onInit?: (socketId: string, payload: InitPayload) => void;
   actionHandlers?: ActionHandlers;
+  preferredPort?: number;
   onReady?: (port: number) => void;
 }
 
@@ -263,15 +281,31 @@ export class SocketServer {
 
     this.setupHandlers();
 
-    // Bind to all interfaces (port 0 = OS picks)
-    this.httpServer.listen(0, () => {
-      const addr = this.httpServer.address();
-      if (addr && typeof addr === "object") {
-        this._port = addr.port;
-        console.log(`[socket] Listening on 0.0.0.0:${this._port}`);
-        options.onReady?.(this._port);
-      }
-    });
+    const startListening = (port: number) => {
+      this.httpServer.listen(port, () => {
+        const addr = this.httpServer.address();
+        if (addr && typeof addr === "object") {
+          this._port = addr.port;
+          console.log(`[socket] Listening on 0.0.0.0:${this._port}`);
+          options.onReady?.(this._port);
+        }
+      });
+    };
+
+    // Try preferred port first, fall back to OS-assigned port on conflict
+    if (options.preferredPort && options.preferredPort > 0) {
+      this.httpServer.once("error", (err: NodeJS.ErrnoException) => {
+        if (err.code === "EADDRINUSE") {
+          console.log(`[socket] Preferred port ${options.preferredPort} in use, falling back to OS-assigned`);
+          startListening(0);
+        } else {
+          throw err;
+        }
+      });
+      startListening(options.preferredPort);
+    } else {
+      startListening(0);
+    }
   }
 
   get port(): number {

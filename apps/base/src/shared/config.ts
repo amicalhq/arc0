@@ -45,6 +45,11 @@ export interface TunnelConfig {
   subdomain?: string;
 }
 
+export interface PortPreferences {
+  controlPort?: number;
+  socketPort?: number;
+}
+
 export interface Arc0Config {
   version: string;
   workstationId: string;
@@ -59,6 +64,7 @@ export interface Arc0Config {
     gemini?: string;
   };
   tunnel?: TunnelConfig;
+  portPreferences?: PortPreferences;
 }
 
 export const DEFAULT_CONFIG: Arc0Config = {

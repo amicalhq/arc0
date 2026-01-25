@@ -21,6 +21,8 @@ import {
   ensureCredentials,
   findPaneByTty,
   loadConfig,
+  getPreferredPorts,
+  savePreferredPorts,
   type Arc0Config,
   type SessionFile,
   type SessionData,
@@ -98,6 +100,12 @@ async function main() {
     },
   });
 
+  // Get preferred ports from config (if any)
+  const portPrefs = getPreferredPorts();
+  if (portPrefs) {
+    console.log(`[daemon] Found port preferences (control: ${portPrefs.controlPort ?? "none"}, socket: ${portPrefs.socketPort ?? "none"})`);
+  }
+
   // Track ports as they become ready
   let controlPort = 0;
   let socketPort = 0;
@@ -112,12 +120,15 @@ async function main() {
         socketPort,
         startedAt: new Date().toISOString(),
       });
+      // Save port preferences for next startup
+      savePreferredPorts(controlPort, socketPort);
       console.log(`[daemon] State written (control: ${controlPort}, socket: ${socketPort})`);
     }
   };
 
   // Create control server (localhost only, for CLI)
   const controlServer = new ControlServer({
+    preferredPort: portPrefs?.controlPort,
     onReady: (port) => {
       controlPort = port;
       maybeWriteState();
@@ -193,6 +204,7 @@ async function main() {
       }));
       sendMessagesForClient(socketId, cursor);
     },
+    preferredPort: portPrefs?.socketPort,
     onReady: (port) => {
       socketPort = port;
       maybeWriteState();
