@@ -30,8 +30,9 @@ function useSyncStatus(): SyncStatus {
   return connectionStatus;
 }
 
-
-function DrawerContent(props: DrawerContentComponentProps & { isPersistent?: boolean, selectedSessionId?: string }) {
+function DrawerContent(
+  props: DrawerContentComponentProps & { isPersistent?: boolean; selectedSessionId?: string }
+) {
   const { theme } = useUniwind();
   const colors = THEME[theme ?? 'light'];
   const insets = useSafeAreaInsets();
@@ -101,9 +102,7 @@ function DrawerContent(props: DrawerContentComponentProps & { isPersistent?: boo
               </View>
               {/* Show syncing badge when other workstations are connected */}
               {backgroundConnectedCount > 0 && (
-                <Text className="text-muted-foreground text-xs">
-                  (+{backgroundConnectedCount})
-                </Text>
+                <Text className="text-muted-foreground text-xs">(+{backgroundConnectedCount})</Text>
               )}
             </View>
             {!isPersistent && (
@@ -162,7 +161,10 @@ function DrawerContent(props: DrawerContentComponentProps & { isPersistent?: boo
             style={{ opacity: hasNoWorkstations ? 0.3 : 1 }}>
             <Icon as={PlusIcon} className="text-muted-foreground size-5" />
           </Pressable>
-          <Pressable testID="settings-button" onPress={handleSettingsPress} className="active:bg-accent rounded-lg p-2">
+          <Pressable
+            testID="settings-button"
+            onPress={handleSettingsPress}
+            className="active:bg-accent rounded-lg p-2">
             <Icon as={SettingsIcon} className="text-muted-foreground size-5" />
           </Pressable>
         </View>
@@ -178,7 +180,7 @@ const MemoizedDrawerContent = React.memo(DrawerContent);
 const DrawerContentWrapper = (props: DrawerContentComponentProps & { isPersistent?: boolean }) => {
   const { id: selectedSessionId } = useGlobalSearchParams<{ id?: string }>();
   return <MemoizedDrawerContent {...props} selectedSessionId={selectedSessionId} />;
-}
+};
 
 export default function DrawerLayout() {
   const { theme } = useUniwind();

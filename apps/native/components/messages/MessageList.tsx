@@ -231,6 +231,8 @@ export function MessageList({ messages }: MessageListProps) {
         startRenderingFromBottom: true,
         autoscrollToBottomThreshold: 0.2,
       }}
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
     />
   );
 }

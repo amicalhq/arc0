@@ -1,7 +1,7 @@
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { MessageList } from '@/components/messages';
-import { ModeModelBar, StopButton } from '@/components/chat';
+import { PromptInput } from '@/components/chat';
 import {
   PLAN_APPROVAL_OPTIONS,
   type PlanApprovalResponse,
@@ -15,16 +15,13 @@ import {
 import { useUserActions } from '@/lib/contexts/UserActionsContext';
 import { useMessages } from '@/lib/store/hooks';
 import { useStoreContext } from '@/lib/store/provider';
-import { THEME } from '@/lib/theme';
 import type { Message } from '@/lib/types/session';
 import { findLatestPendingTool, isNonInteractiveTool } from '@/lib/utils/tool-state';
 import type { ModelId, PromptMode, AnswerItem, ToolResponse } from '@arc0/types';
 import { useLocalSearchParams } from 'expo-router';
-import { MessageSquareIcon, SendIcon } from 'lucide-react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, TextInput, View } from 'react-native';
-import { KeyboardStickyView } from 'react-native-keyboard-controller';
-import { useUniwind } from 'uniwind';
+import { MessageSquareIcon } from 'lucide-react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Keyboard, Platform, Pressable, View } from 'react-native';
 
 interface Question {
   question: string;
@@ -107,24 +104,17 @@ function getLastMessageInfo(messages: Message[]): { id: string; ts: number } | n
 }
 
 function ChatContent({ sessionId }: { sessionId: string }) {
-  const { theme } = useUniwind();
-  const colors = THEME[theme ?? 'light'];
   const { isReady } = useStoreContext();
   const { messages, isLoadingMessages } = useMessages(sessionId);
   const [inputText, setInputText] = useState('');
-  const [inputHeight, setInputHeight] = useState(44);
-  const [inputFocused, setInputFocused] = useState(false);
   const [mode, setMode] = useState<PromptMode>('default');
   const [model, setModel] = useState<ModelId>('default');
-  const inputRef = useRef<TextInput>(null);
 
   // Loading state: store not ready OR actively loading closed session messages
   const isLoading = !isReady || isLoadingMessages;
 
   const { sendPrompt, stopAgent, approveToolUse, actionStates } = useUserActions();
-  const isSubmitting =
-    actionStates.sendPrompt.isLoading ||
-    actionStates.approveToolUse.isLoading;
+  const isSubmitting = actionStates.sendPrompt.isLoading || actionStates.approveToolUse.isLoading;
   const isStopping = actionStates.stopAgent.isLoading;
 
   const pendingQuestionContext = usePendingQuestion();
@@ -184,13 +174,6 @@ function ChatContent({ sessionId }: { sessionId: string }) {
     return false;
   }, [pendingTool, selections]);
 
-  // Focus input when "Other" is selected or "Provide feedback" is selected
-  useEffect(() => {
-    if (hasOtherSelected || planApprovalSelection === 'feedback') {
-      inputRef.current?.focus();
-    }
-  }, [hasOtherSelected, planApprovalSelection]);
-
   // Determine placeholder text
   const placeholder = useMemo(() => {
     if (pendingTool?.type === 'ExitPlanMode') {
@@ -209,7 +192,7 @@ function ChatContent({ sessionId }: { sessionId: string }) {
         const labels: Record<string, string> = {
           'approve-once': 'Yes',
           'approve-always': 'Yes, always',
-          'reject': 'No',
+          reject: 'No',
         };
         return `Send: "${labels[toolApprovalSelection] || toolApprovalSelection}"`;
       }
@@ -233,7 +216,14 @@ function ChatContent({ sessionId }: { sessionId: string }) {
     }
 
     return 'Send a message...';
-  }, [hasSelections, hasOtherSelected, getSelectionSummary, pendingTool, planApprovalSelection, toolApprovalSelection]);
+  }, [
+    hasSelections,
+    hasOtherSelected,
+    getSelectionSummary,
+    pendingTool,
+    planApprovalSelection,
+    toolApprovalSelection,
+  ]);
 
   // Handle text input change
   const handleTextChange = (text: string) => {
@@ -472,7 +462,16 @@ function ChatContent({ sessionId }: { sessionId: string }) {
 
     // For regular messages
     return inputText.trim().length > 0;
-  }, [pendingTool, planApprovalSelection, toolApprovalSelection, hasSelections, hasOtherSelected, inputText, isSubmitting, contextIsSubmitting]);
+  }, [
+    pendingTool,
+    planApprovalSelection,
+    toolApprovalSelection,
+    hasSelections,
+    hasOtherSelected,
+    inputText,
+    isSubmitting,
+    contextIsSubmitting,
+  ]);
 
   // Handle key press for web (Enter to submit, Shift+Enter for newline)
   const handleKeyPress = (e: { nativeEvent: { key: string; shiftKey?: boolean } }) => {
@@ -494,78 +493,47 @@ function ChatContent({ sessionId }: { sessionId: string }) {
       {/* Messages area */}
       <View className="flex-1">
         {isLoading ? (
-          <View className="flex-1 items-center justify-center">
+          <Pressable
+            className="flex-1 items-center justify-center"
+            onPress={() => Keyboard.dismiss()}>
             <Text className="text-muted-foreground">Loading messages...</Text>
-          </View>
+          </Pressable>
         ) : messages.length > 0 ? (
           <MessageList messages={messages} />
         ) : (
-          <View className="flex-1 items-center justify-center gap-4 p-6">
+          <Pressable
+            className="flex-1 items-center justify-center gap-4 p-6"
+            onPress={() => Keyboard.dismiss()}>
             <View className="bg-muted rounded-full p-4">
               <Icon as={MessageSquareIcon} className="text-muted-foreground size-8" />
             </View>
             <Text className="text-muted-foreground text-center">No messages yet</Text>
-          </View>
+          </Pressable>
         )}
       </View>
 
-      {/* Input area - sticks above keyboard */}
-      <KeyboardStickyView offset={{ opened: 0, closed: 0 }}>
-        {/* Mode/Model Bar - only show when not responding to interactive tools */}
-        {!pendingTool && (
-          <ModeModelBar
-            mode={mode}
-            model={model}
-            onModeChange={setMode}
-            onModelChange={setModel}
-            disabled={isSubmitting}
-            visible={inputFocused}
-          />
-        )}
-
-        <View className="border-border bg-background flex-row items-end gap-2 border-t p-4">
-          <TextInput
-            testID="message-input"
-            ref={inputRef}
-            placeholder={placeholder}
-            placeholderTextColor={
-              hasSelections || hasOtherSelected || planApprovalSelection || toolApprovalSelection
-                ? colors.primary
-                : colors.mutedForeground
-            }
-            value={inputText}
-            onChangeText={handleTextChange}
-            onFocus={() => setInputFocused(true)}
-            onBlur={() => setInputFocused(false)}
-            onKeyPress={handleKeyPress}
-            editable={!isSubmitting && !contextIsSubmitting}
-            className="border-border bg-background text-foreground flex-1 rounded-lg border px-4 py-3"
-            multiline
-            onContentSizeChange={(e) => {
-              const height = e.nativeEvent.contentSize.height; // account for padding
-              setInputHeight(Math.min(Math.max(44, height), 120));
-            }}
-            style={{ height: inputHeight }}
-          />
-
-          {/* Show stop button when agent is running, send button otherwise */}
-          {agentRunning && !pendingTool ? (
-            <StopButton onPress={handleStop} isLoading={isStopping} disabled={isStopping} />
-          ) : (
-            <Pressable
-              testID="send-button"
-              onPress={handleSubmit}
-              disabled={!canSubmit}
-              className="bg-primary rounded-lg p-3 active:opacity-80 disabled:opacity-50">
-              {contextIsSubmitting ? (
-                <ActivityIndicator size="small" color="white" />
-              ) : (
-                <Icon as={SendIcon} className="text-primary-foreground size-5" />
-              )}
-            </Pressable>
-          )}
-        </View>
-      </KeyboardStickyView>
+      {/* Prompt input */}
+      <PromptInput
+        value={inputText}
+        onChangeText={handleTextChange}
+        placeholder={placeholder}
+        highlightPlaceholder={
+          hasSelections || hasOtherSelected || !!planApprovalSelection || !!toolApprovalSelection
+        }
+        onSubmit={handleSubmit}
+        canSubmit={canSubmit}
+        isSubmitting={contextIsSubmitting}
+        editable={!isSubmitting && !contextIsSubmitting}
+        mode={mode}
+        onModeChange={setMode}
+        model={model}
+        onModelChange={setModel}
+        showSelectors
+        agentRunning={agentRunning}
+        onStop={handleStop}
+        isStopping={isStopping}
+        onKeyPress={handleKeyPress}
+      />
     </View>
   );
 }

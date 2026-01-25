@@ -27,7 +27,7 @@ export function StopButton({ onPress, isLoading = false, disabled = false }: Sto
       testID="stop-button"
       onPress={onPress}
       disabled={disabled || isLoading}
-      className="bg-destructive rounded-lg p-3 active:opacity-80 disabled:opacity-50"
+      className="bg-destructive rounded-full p-2 active:opacity-80 disabled:opacity-50"
       accessibilityRole="button"
       accessibilityLabel="Stop agent"
       accessibilityHint="Interrupts the currently running agent">
