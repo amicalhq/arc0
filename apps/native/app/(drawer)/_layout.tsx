@@ -30,7 +30,6 @@ function useSyncStatus(): SyncStatus {
   return connectionStatus;
 }
 
-const DRAWER_WIDTH = 320;
 
 function DrawerContent(props: DrawerContentComponentProps & { isPersistent?: boolean, selectedSessionId?: string }) {
   const { theme } = useUniwind();
@@ -185,7 +184,7 @@ export default function DrawerLayout() {
   const { theme } = useUniwind();
   const colors = THEME[theme ?? 'light'];
   const pathname = usePathname();
-  const { isPersistent } = useResponsiveDrawer();
+  const { isPersistent, drawerWidth } = useResponsiveDrawer();
   const defaultStatus = isPersistent || pathname === '/' || pathname === '' ? 'open' : 'closed';
 
   return (
@@ -195,7 +194,7 @@ export default function DrawerLayout() {
       screenOptions={{
         drawerType: isPersistent ? 'permanent' : 'front',
         drawerStyle: {
-          width: isPersistent ? DRAWER_WIDTH : '100%',
+          width: isPersistent ? drawerWidth : '100%',
           backgroundColor: colors.background,
         },
         drawerActiveTintColor: colors.primary,
