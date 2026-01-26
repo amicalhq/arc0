@@ -13,9 +13,9 @@ import {
   usePendingQuestion,
 } from '@/lib/contexts/PendingQuestionContext';
 import { useUserActions } from '@/lib/contexts/UserActionsContext';
-import { useMessages } from '@/lib/store/hooks';
+import { useMessages, useSession } from '@/lib/store/hooks';
 import { useStoreContext } from '@/lib/store/provider';
-import type { Message } from '@/lib/types/session';
+import type { Message, PendingPermission } from '@/lib/types/session';
 import { findLatestPendingTool, isNonInteractiveTool } from '@/lib/utils/tool-state';
 import type { ModelId, PromptMode, AnswerItem, ToolResponse } from '@arc0/types';
 import { useLocalSearchParams } from 'expo-router';
@@ -35,14 +35,26 @@ type PendingInteractiveTool =
   | { type: 'ExitPlanMode'; planFilePath?: string; toolUseId: string }
   | { type: 'ToolPermission'; toolName: string; toolUseId: string; input: Record<string, unknown> };
 
-// Find the latest pending interactive tool from messages
-function findPendingInteractiveTool(messages: Message[]): PendingInteractiveTool | null {
+/**
+ * Find the latest pending interactive tool from messages.
+ * For AskUserQuestion and ExitPlanMode, we infer from message content.
+ * For ToolPermission, we require an explicit permission request from the daemon.
+ *
+ * @param messages - Session messages
+ * @param pendingPermission - Explicit permission request from daemon (null if none)
+ */
+function findPendingInteractiveTool(
+  messages: Message[],
+  pendingPermission: PendingPermission | null
+): PendingInteractiveTool | null {
   if (messages.length === 0) return null;
 
   const pendingTool = findLatestPendingTool(messages);
   if (!pendingTool) return null;
 
   const toolUse = pendingTool.block;
+
+  // AskUserQuestion is always interactive (handled via tool input, not permission hook)
   if (toolUse.name === 'AskUserQuestion' && toolUse.input?.questions) {
     return {
       type: 'AskUserQuestion',
@@ -51,6 +63,7 @@ function findPendingInteractiveTool(messages: Message[]): PendingInteractiveTool
     };
   }
 
+  // ExitPlanMode is always interactive (plan approval)
   if (toolUse.name === 'ExitPlanMode') {
     return {
       type: 'ExitPlanMode',
@@ -59,16 +72,23 @@ function findPendingInteractiveTool(messages: Message[]): PendingInteractiveTool
     };
   }
 
+  // Non-interactive tools never need approval
   if (isNonInteractiveTool(toolUse.name)) {
     return null;
   }
 
-  return {
-    type: 'ToolPermission',
-    toolName: toolUse.name,
-    toolUseId: toolUse.id,
-    input: (toolUse.input ?? {}) as Record<string, unknown>,
-  };
+  // For other tools, only show permission prompt if daemon sent explicit permission_request
+  // This prevents showing prompts for tools that don't need approval
+  if (pendingPermission && pendingPermission.toolUseId === toolUse.id) {
+    return {
+      type: 'ToolPermission',
+      toolName: pendingPermission.toolName,
+      toolUseId: pendingPermission.toolUseId,
+      input: pendingPermission.toolInput,
+    };
+  }
+
+  return null;
 }
 
 // Check if agent is currently running (last assistant message has tool_use stopReason)
@@ -106,6 +126,7 @@ function getLastMessageInfo(messages: Message[]): { id: string; ts: number } | n
 function ChatContent({ sessionId }: { sessionId: string }) {
   const { isReady } = useStoreContext();
   const { messages, isLoadingMessages } = useMessages(sessionId);
+  const session = useSession(sessionId);
   const [inputText, setInputText] = useState('');
   const [mode, setMode] = useState<PromptMode>('default');
   const [model, setModel] = useState<ModelId>('default');
@@ -128,11 +149,11 @@ function ChatContent({ sessionId }: { sessionId: string }) {
     setIsSubmitting,
   } = pendingQuestionContext;
 
-  // Detect pending interactive tool from messages
+  // Detect pending interactive tool from messages and explicit permission requests
   const pendingTool = useMemo(() => {
     if (messages.length === 0) return null;
-    return findPendingInteractiveTool(messages);
-  }, [messages]);
+    return findPendingInteractiveTool(messages, session?.pendingPermission ?? null);
+  }, [messages, session?.pendingPermission]);
 
   // Detect if agent is running
   const agentRunning = useMemo(() => isAgentRunning(messages), [messages]);

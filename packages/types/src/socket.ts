@@ -4,6 +4,7 @@
 
 import type { ProviderId } from "./enums";
 import type { ContentBlock } from "./content-blocks";
+import type { SessionEvent } from "./session";
 import type {
   ActionResult,
   ApproveToolUsePayload,
@@ -186,6 +187,15 @@ export interface MessagesBatchPayload {
   batchId: string;
 }
 
+/**
+ * Payload for permissionRequest event (Base -> App).
+ */
+export interface PermissionRequestPayload {
+  workstationId: string;
+  sessionId: string;
+  event: SessionEvent;
+}
+
 // =============================================================================
 // Socket.IO Event Maps
 // =============================================================================
@@ -215,6 +225,8 @@ export interface ServerToClient extends PairingServerToClient {
   "sessions": (payload: EncryptedEnvelope) => void;
   "projects": (payload: EncryptedEnvelope) => void;
   "messages": (payload: EncryptedEnvelope, ack: () => void) => void;
+  // Note: Permission requests are sent through the "messages" channel
+  // with payload.type === 'permission_request'
 }
 
 /**

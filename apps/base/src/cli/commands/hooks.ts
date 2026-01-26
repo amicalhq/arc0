@@ -17,6 +17,7 @@ interface ClaudeSettings {
   hooks?: {
     SessionStart?: Array<{ hooks: Array<{ type: string; command: string }> }>;
     SessionEnd?: Array<{ hooks: Array<{ type: string; command: string }> }>;
+    PermissionRequest?: Array<{ hooks: Array<{ type: string; command: string }> }>;
     [key: string]: unknown;
   };
   [key: string]: unknown;
@@ -43,6 +44,7 @@ function isClaudeHookInstalled(): boolean {
   const settings = loadClaudeSettings();
   const sessionStart = settings.hooks?.SessionStart;
   const sessionEnd = settings.hooks?.SessionEnd;
+  const permissionRequest = settings.hooks?.PermissionRequest;
 
   const hasStart = sessionStart?.some((entry) =>
     entry.hooks?.some((h) => h.command?.includes("claude-session.js"))
@@ -50,8 +52,11 @@ function isClaudeHookInstalled(): boolean {
   const hasEnd = sessionEnd?.some((entry) =>
     entry.hooks?.some((h) => h.command?.includes("claude-session.js"))
   );
+  const hasPermission = permissionRequest?.some((entry) =>
+    entry.hooks?.some((h) => h.command?.includes("claude-session.js"))
+  );
 
-  return Boolean(hasStart && hasEnd);
+  return Boolean(hasStart && hasEnd && hasPermission);
 }
 
 export async function installClaudeHooks(): Promise<boolean> {
@@ -109,6 +114,17 @@ export async function installClaudeHooks(): Promise<boolean> {
       settings.hooks.SessionEnd.push(hookEntry);
     }
 
+    // Add PermissionRequest hook if not present
+    if (!settings.hooks.PermissionRequest) {
+      settings.hooks.PermissionRequest = [];
+    }
+    const hasPermission = settings.hooks.PermissionRequest.some((entry) =>
+      entry.hooks?.some((h) => h.command?.includes("claude-session.js"))
+    );
+    if (!hasPermission) {
+      settings.hooks.PermissionRequest.push(hookEntry);
+    }
+
     saveClaudeSettings(settings);
 
     s.stop("Claude Code hooks installed");
@@ -150,6 +166,15 @@ export async function uninstallClaudeHooks(): Promise<boolean> {
       );
       if (settings.hooks.SessionEnd.length === 0) {
         delete settings.hooks.SessionEnd;
+      }
+    }
+
+    if (settings.hooks?.PermissionRequest) {
+      settings.hooks.PermissionRequest = settings.hooks.PermissionRequest.filter(
+        (entry) => !entry.hooks?.some((h) => h.command?.includes("claude-session.js"))
+      );
+      if (settings.hooks.PermissionRequest.length === 0) {
+        delete settings.hooks.PermissionRequest;
       }
     }
 

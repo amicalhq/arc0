@@ -1,6 +1,7 @@
 import { watch, type FSWatcher } from "chokidar";
-import { readFileSync, existsSync, mkdirSync } from "node:fs";
-import { basename } from "node:path";
+import { readFileSync, existsSync, mkdirSync, statSync } from "node:fs";
+import { basename, join } from "node:path";
+import type { SessionEvent } from "@arc0/types";
 import { SESSIONS_DIR } from "../../shared/config.js";
 import { eventBus } from "../../shared/events.js";
 import type { SessionFile } from "../../shared/types.js";
@@ -12,6 +13,7 @@ import type { SessionFile } from "../../shared/types.js";
 export class SessionFileWatcher {
   private watcher: FSWatcher | null = null;
   private activeSessions = new Map<string, SessionFile>();
+  private eventFileOffsets = new Map<string, number>(); // Track read position for .events.jsonl files
   private isRunning = false;
 
   async start(): Promise<void> {
@@ -32,9 +34,27 @@ export class SessionFileWatcher {
       },
     });
 
-    this.watcher.on("add", (path) => this.handleAdd(path));
-    this.watcher.on("change", (path) => this.handleChange(path));
-    this.watcher.on("unlink", (path) => this.handleRemove(path));
+    this.watcher.on("add", (path) => {
+      if (path.endsWith(".events.jsonl")) {
+        this.handleEventsAdd(path);
+      } else {
+        this.handleAdd(path);
+      }
+    });
+    this.watcher.on("change", (path) => {
+      if (path.endsWith(".events.jsonl")) {
+        this.handleEventsChange(path);
+      } else {
+        this.handleChange(path);
+      }
+    });
+    this.watcher.on("unlink", (path) => {
+      if (path.endsWith(".events.jsonl")) {
+        this.handleEventsRemove(path);
+      } else {
+        this.handleRemove(path);
+      }
+    });
 
     this.isRunning = true;
     console.log(`[sessions] Watching: ${SESSIONS_DIR}`);
@@ -65,6 +85,63 @@ export class SessionFileWatcher {
     const filename = basename(filePath);
     if (!filename.endsWith(".json")) return null;
     return filename.replace(".json", "");
+  }
+
+  private getSessionIdFromEventsPath(filePath: string): string | null {
+    const filename = basename(filePath);
+    if (!filename.endsWith(".events.jsonl")) return null;
+    return filename.replace(".events.jsonl", "");
+  }
+
+  private readNewEventsFromFile(filePath: string, sessionId: string): void {
+    try {
+      const stats = statSync(filePath);
+      const currentOffset = this.eventFileOffsets.get(sessionId) ?? 0;
+
+      if (stats.size <= currentOffset) return;
+
+      // Read file as Buffer and slice by byte offset to handle UTF-8 correctly
+      const buffer = readFileSync(filePath);
+      const newContent = buffer.subarray(currentOffset).toString("utf-8");
+      const lines = newContent.split("\n").filter((line) => line.trim());
+
+      for (const line of lines) {
+        try {
+          const event = JSON.parse(line) as SessionEvent;
+          eventBus.emit("permission:request", sessionId, event);
+        } catch {
+          // Invalid JSON line, skip
+        }
+      }
+
+      // Update offset to current file size (in bytes)
+      this.eventFileOffsets.set(sessionId, stats.size);
+    } catch {
+      // File may not exist or be unreadable, ignore
+    }
+  }
+
+  private handleEventsAdd(filePath: string): void {
+    const sessionId = this.getSessionIdFromEventsPath(filePath);
+    if (!sessionId) return;
+
+    // Initialize offset and read any existing events
+    this.eventFileOffsets.set(sessionId, 0);
+    this.readNewEventsFromFile(filePath, sessionId);
+  }
+
+  private handleEventsChange(filePath: string): void {
+    const sessionId = this.getSessionIdFromEventsPath(filePath);
+    if (!sessionId) return;
+
+    this.readNewEventsFromFile(filePath, sessionId);
+  }
+
+  private handleEventsRemove(filePath: string): void {
+    const sessionId = this.getSessionIdFromEventsPath(filePath);
+    if (!sessionId) return;
+
+    this.eventFileOffsets.delete(sessionId);
   }
 
   private emitSessionsChange(): void {

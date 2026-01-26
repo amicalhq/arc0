@@ -2,7 +2,7 @@
 /**
  * Arc0 Claude Code Session Hook
  *
- * This script is called by Claude Code on SessionStart and SessionEnd events.
+ * This script is called by Claude Code on SessionStart, SessionEnd, and PermissionRequest events.
  * It reads session data from stdin and manages session files.
  * Note: CONFIG_DIR is templated during installation by `arc0 hooks install`.
  *
@@ -11,8 +11,16 @@
  *   "session_id": "...",
  *   "transcript_path": "...",
  *   "cwd": "...",
- *   "hook_event_name": "SessionStart" | "SessionEnd",
+ *   "hook_event_name": "SessionStart" | "SessionEnd" | "PermissionRequest",
  *   "source": "startup" (for start) | "reason": "..." (for end)
+ * }
+ *
+ * For PermissionRequest, additional fields:
+ * {
+ *   "tool_use_id": "...",
+ *   "tool_name": "...",
+ *   "tool_input": {...},
+ *   "permission_mode": "..."
  * }
  */
 
@@ -106,6 +114,37 @@ async function handleSessionEnd(payload) {
   } catch {
     // File may not exist, ignore
   }
+
+  // Remove events file
+  const eventsPath = path.join(SESSIONS_DIR, `${sessionId}.events.jsonl`);
+  try {
+    fs.unlinkSync(eventsPath);
+  } catch {
+    // File may not exist, ignore
+  }
+}
+
+async function handlePermissionRequest(payload) {
+  const sessionId = payload.session_id;
+
+  // Ensure sessions directory exists
+  if (!fs.existsSync(SESSIONS_DIR)) {
+    fs.mkdirSync(SESSIONS_DIR, { recursive: true });
+  }
+
+  // Create event entry
+  const event = {
+    type: "permission_request",
+    toolUseId: payload.tool_use_id,
+    toolName: payload.tool_name,
+    toolInput: payload.tool_input,
+    permissionMode: payload.permission_mode,
+    timestamp: new Date().toISOString(),
+  };
+
+  // Append to events JSONL file
+  const eventsPath = path.join(SESSIONS_DIR, `${sessionId}.events.jsonl`);
+  fs.appendFileSync(eventsPath, JSON.stringify(event) + "\n", "utf-8");
 }
 
 async function main() {
@@ -128,6 +167,9 @@ async function main() {
       break;
     case "SessionEnd":
       await handleSessionEnd(payload);
+      break;
+    case "PermissionRequest":
+      await handlePermissionRequest(payload);
       break;
     default:
       // Unknown hook, exit silently

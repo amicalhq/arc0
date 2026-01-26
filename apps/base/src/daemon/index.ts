@@ -262,6 +262,22 @@ async function main() {
     });
   });
 
+  // Handle permission request events - send through messages channel
+  eventBus.on("permission:request", (sessionId, event) => {
+    console.log(`[daemon] permission:request: ${event.toolName} for ${sessionId}`);
+
+    // Send as a RawMessageEnvelope through the messages channel
+    // The payload includes type: 'permission_request' so native can detect it
+    socketServer.sendMessagesBatch({
+      workstationId,
+      messages: [{
+        sessionId,
+        payload: event, // SessionEvent with type: 'permission_request'
+      }],
+      batchId: randomUUID(),
+    });
+  });
+
   // Start all watchers and project store
   await Promise.all([
     sessionWatcher.start(),

@@ -73,6 +73,28 @@ function isCustomTitleLine(payload: unknown): payload is CustomTitleLine {
   return p.type === 'custom-title' && typeof p.customTitle === 'string';
 }
 
+/**
+ * Permission request payload from daemon.
+ * Sent through the messages channel with type: 'permission_request'.
+ */
+export interface PermissionRequestLine {
+  type: 'permission_request';
+  toolUseId: string;
+  toolName: string;
+  toolInput: Record<string, unknown>;
+  permissionMode: string;
+  timestamp: string;
+}
+
+/**
+ * Check if raw payload is a permission request.
+ */
+export function isPermissionRequestLine(payload: unknown): payload is PermissionRequestLine {
+  if (!payload || typeof payload !== 'object') return false;
+  const p = payload as Record<string, unknown>;
+  return p.type === 'permission_request' && typeof p.toolUseId === 'string';
+}
+
 // =============================================================================
 // Content Block Transformation
 // =============================================================================
@@ -230,6 +252,72 @@ export function transformRawLine(envelope: RawMessageEnvelope): ProcessedMessage
  */
 export function transformRawBatch(envelopes: RawMessageEnvelope[]): ProcessedMessage[] {
   return envelopes.map(transformRawLine).filter((msg): msg is ProcessedMessage => msg !== null);
+}
+
+/**
+ * Extract permission requests from a batch of raw envelopes.
+ * Returns a Map keyed by sessionId, with the latest permission request for each session.
+ */
+export function extractPermissionRequests(
+  envelopes: RawMessageEnvelope[]
+): Map<string, PermissionRequestLine> {
+  const requests = new Map<string, PermissionRequestLine>();
+
+  for (const envelope of envelopes) {
+    if (isPermissionRequestLine(envelope.payload)) {
+      // Store by sessionId - only keep latest per session
+      requests.set(envelope.sessionId, envelope.payload);
+      debugLog('transform', 'permission request extracted', {
+        sessionId: envelope.sessionId,
+        toolUseId: envelope.payload.toolUseId,
+        toolName: envelope.payload.toolName,
+      });
+    }
+  }
+
+  return requests;
+}
+
+/**
+ * Extract tool_use_ids that have received tool_results in this batch.
+ * Returns a Map keyed by sessionId with Set of tool_use_ids that got results.
+ * Used to clear pending permissions when a tool has been resolved.
+ */
+export function extractResolvedToolUseIds(
+  envelopes: RawMessageEnvelope[]
+): Map<string, Set<string>> {
+  const resolved = new Map<string, Set<string>>();
+
+  for (const envelope of envelopes) {
+    if (!isMessageLine(envelope.payload)) continue;
+
+    const raw = envelope.payload as RawMessageLine;
+    // Only user messages contain tool_results
+    if (raw.type !== 'user') continue;
+
+    const content = raw.message.content;
+    if (!Array.isArray(content)) continue;
+
+    for (const block of content) {
+      if (
+        block &&
+        typeof block === 'object' &&
+        (block as Record<string, unknown>).type === 'tool_result'
+      ) {
+        const toolUseId = (block as Record<string, unknown>).tool_use_id as string;
+        if (toolUseId) {
+          let sessionSet = resolved.get(envelope.sessionId);
+          if (!sessionSet) {
+            sessionSet = new Set<string>();
+            resolved.set(envelope.sessionId, sessionSet);
+          }
+          sessionSet.add(toolUseId);
+        }
+      }
+    }
+  }
+
+  return resolved;
 }
 
 // =============================================================================

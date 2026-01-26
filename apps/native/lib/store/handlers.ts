@@ -15,7 +15,9 @@ import {
 } from '../socket/processor';
 import {
   calculateSessionMetadataFromRaw,
+  extractPermissionRequests,
   extractProjectsFromRaw,
+  extractResolvedToolUseIds,
   extractSessionNameUpdates,
   getLastMessageInfo,
   transformRawBatch,
@@ -274,8 +276,12 @@ export async function handleMessagesBatch(
     messageTypes: processedMessages.map((m) => m.type),
   });
 
+  // Handle permission requests BEFORE early return - they may come alone in batches
+  // without any user/assistant messages
+  updatePendingPermissions(store, rawEnvelopes);
+
   if (processedMessages.length === 0) {
-    // All lines were non-message types (summary, file-history-snapshot, etc.)
+    // All lines were non-message types (summary, file-history-snapshot, permission_request, etc.)
     return { lastMessageId: '', lastMessageTs: '' };
   }
 
@@ -336,6 +342,9 @@ export async function handleMessagesBatch(
 
   // 5. Update session status from last message
   updateSessionStatus(store, rawEnvelopes);
+
+  // Note: Permission requests are handled before the early return above
+  // to ensure they work even when sent in standalone batches
 
   // 6. Extract and store artifacts (todos, plans)
   await extractAndStoreArtifacts(store, rawEnvelopes);
@@ -553,6 +562,75 @@ function updateSessionStatus(store: Store, rawEnvelopes: RawMessageEnvelope[]): 
 function getEnvelopeTimestamp(envelope: RawMessageEnvelope): string {
   const payload = envelope.payload as Record<string, unknown>;
   return (payload.timestamp as string) ?? '';
+}
+
+// =============================================================================
+// Permission Request Handling
+// =============================================================================
+
+/**
+ * Update pending permissions for sessions based on permission requests and tool results.
+ * - Adds pending permission when type: 'permission_request' is received
+ * - Clears pending permission when tool_result for that toolUseId is received
+ */
+function updatePendingPermissions(store: Store, rawEnvelopes: RawMessageEnvelope[]): void {
+  // Extract permission requests from the batch
+  const permissionRequests = extractPermissionRequests(rawEnvelopes);
+
+  // Extract tool_use_ids that received results (to clear pending permissions)
+  const resolvedToolUseIds = extractResolvedToolUseIds(rawEnvelopes);
+
+  if (permissionRequests.size === 0 && resolvedToolUseIds.size === 0) {
+    return;
+  }
+
+  store.transaction(() => {
+    // First, clear any pending permissions that have been resolved
+    for (const [sessionId, toolUseIds] of resolvedToolUseIds) {
+      const session = store.getRow('sessions', sessionId);
+      const pendingJson = session?.pending_permission as string | undefined;
+      if (pendingJson) {
+        try {
+          const pending = JSON.parse(pendingJson) as { toolUseId: string };
+          if (toolUseIds.has(pending.toolUseId)) {
+            // This permission was resolved, clear it
+            store.setPartialRow('sessions', sessionId, {
+              pending_permission: '',
+            });
+            debugLog('permissions', 'cleared resolved permission', {
+              sessionId,
+              toolUseId: pending.toolUseId,
+            });
+          }
+        } catch {
+          // Invalid JSON, clear it anyway
+          store.setPartialRow('sessions', sessionId, {
+            pending_permission: '',
+          });
+        }
+      }
+    }
+
+    // Then, set new pending permissions
+    for (const [sessionId, request] of permissionRequests) {
+      // Store the pending permission as JSON in the session row
+      store.setPartialRow('sessions', sessionId, {
+        pending_permission: JSON.stringify({
+          toolUseId: request.toolUseId,
+          toolName: request.toolName,
+          toolInput: request.toolInput,
+          permissionMode: request.permissionMode,
+          timestamp: request.timestamp,
+        }),
+      });
+
+      debugLog('permissions', 'stored pending permission', {
+        sessionId,
+        toolUseId: request.toolUseId,
+        toolName: request.toolName,
+      });
+    }
+  });
 }
 
 // =============================================================================

@@ -14,7 +14,7 @@ import {
   useValue,
 } from 'tinybase/ui-react';
 
-import type { ContentBlock, Message, Session } from '@/lib/types/session';
+import type { ContentBlock, Message, PendingPermission, Session } from '@/lib/types/session';
 import type { SessionStatus, StatusInfo } from '@/lib/types/session-status';
 import { useUserActionsSafe } from '@/lib/contexts/UserActionsContext';
 import { loadClosedSessionMessages, recordClosedSessionAccess } from './closed-sessions';
@@ -44,6 +44,7 @@ interface SessionRow {
   open?: number; // 1 = open, 0 = closed
   status?: string; // SessionStatus type
   status_detail?: string; // Human-readable status label
+  pending_permission?: string; // JSON string of PendingPermission or empty
 }
 
 /**
@@ -80,6 +81,16 @@ interface ProjectRow {
  * @param projectPath - Full project path for display (UI handles truncation)
  */
 function transformSession(id: string, row: SessionRow, projectPath?: string): Session {
+  // Parse pending permission from JSON string
+  let pendingPermission: PendingPermission | null = null;
+  if (row.pending_permission) {
+    try {
+      pendingPermission = JSON.parse(row.pending_permission) as PendingPermission;
+    } catch {
+      console.warn('[hooks] Failed to parse pending_permission:', id);
+    }
+  }
+
   return {
     id,
     name: row.name ?? null,
@@ -94,6 +105,7 @@ function transformSession(id: string, row: SessionRow, projectPath?: string): Se
     lastMessageAt: row.last_message_at ?? null,
     status: (row.status as SessionStatus) ?? 'idle',
     statusDetail: row.status_detail ?? 'Ready',
+    pendingPermission,
   };
 }
 

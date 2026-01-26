@@ -1,5 +1,17 @@
 import type { SessionStatus } from './session-status';
 
+/**
+ * Pending permission request from daemon.
+ * Stored in session when Claude Code is waiting for tool approval.
+ */
+export interface PendingPermission {
+  toolUseId: string;
+  toolName: string;
+  toolInput: Record<string, unknown>;
+  permissionMode: string;
+  timestamp: string;
+}
+
 export interface Session {
   id: string;
   name: string | null;
@@ -14,6 +26,8 @@ export interface Session {
   lastMessageAt: string | null;
   status: SessionStatus;
   statusDetail: string;
+  /** Pending permission request, if any. Null when no approval is needed. */
+  pendingPermission: PendingPermission | null;
 }
 
 export interface User {
