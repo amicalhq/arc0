@@ -83,6 +83,7 @@ function transformSession(id: string, row: SessionRow, projectPath?: string): Se
   return {
     id,
     name: row.name ?? null,
+    firstMessage: row.first_message ?? null,
     projectName: projectPath ?? row.project_id ?? 'Unknown Project',
     providerId: row.provider ?? 'claude',
     model: row.model ?? null,

@@ -3,6 +3,7 @@ import type { SessionStatus } from './session-status';
 export interface Session {
   id: string;
   name: string | null;
+  firstMessage: string | null;
   projectName: string;
   providerId: string;
   model: string | null;

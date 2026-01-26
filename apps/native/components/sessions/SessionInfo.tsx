@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import { GitBranch, Folder } from 'lucide-react-native';
 import { ProviderIcon } from './ProviderIcon';
 import { truncatePath } from '@/lib/utils/path';
+import { formatFirstMessageForDisplay } from '@/lib/utils/session-display';
 
 interface SessionInfoProps {
   session: Session;
@@ -26,7 +27,8 @@ const PATH_MAX_LENGTH = {
  */
 export function SessionInfo({ session, size = 'default', context = 'list' }: SessionInfoProps) {
   const isLive = !session.endedAt;
-  const displayName = session.name || `Session ${session.id.slice(-8)}`;
+  const formattedFirstMessage = session.firstMessage ? formatFirstMessageForDisplay(session.firstMessage) : null;
+  const displayName = session.name || formattedFirstMessage || `Session ${session.id.slice(-8)}`;
   const pathMaxLength = PATH_MAX_LENGTH[context];
 
   const iconSize = size === 'compact' ? 16 : 18;
