@@ -33,7 +33,7 @@ export function WelcomeEmpty({ compact = false }: WelcomeEmptyProps) {
 
       <Pressable
         testID="connect-workstation-button"
-        onPress={() => router.push('/settings')}
+        onPress={() => router.push({ pathname: '/settings', params: { modal: 'add-workstation' } })}
         className={`bg-primary flex-row items-center gap-2 rounded-lg active:opacity-80 ${compact ? 'px-4 py-2' : 'px-6 py-3'}`}>
         <Icon
           as={PlusIcon}
