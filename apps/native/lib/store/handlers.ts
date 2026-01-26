@@ -21,9 +21,10 @@ import {
   extractSessionNameUpdates,
   getLastMessageInfo,
   transformRawBatchWithOutputs,
+  type PermissionRequestLine,
   type SessionNameUpdate,
 } from '../socket/transformer';
-import { extractArtifactsFromRawBatch } from '../socket/artifact-extractor';
+import { extractArtifactsFromRawBatch, type ExtractedArtifact } from '../socket/artifact-extractor';
 import { executeStatement, getDbInstance, withTransaction } from './persister';
 import { upsertArtifactToStore, writeArtifactsToSQLite } from './artifacts-loader';
 import { computeSessionStatus } from './status';
@@ -36,6 +37,52 @@ function debugLog(tag: string, message: string, data?: unknown): void {
   if (__DEV__) {
     console.log(`[${tag}] ${message}`, data ?? '');
   }
+}
+
+// =============================================================================
+// Message Batch Processing Queue
+// =============================================================================
+// Serializes message batch processing to prevent concurrent SQLite transactions.
+// expo-sqlite's withTransactionAsync doesn't support nested transactions, so
+// when multiple Socket.IO batches arrive rapidly (e.g., on reconnection), we
+// need to process them sequentially.
+
+/**
+ * Result from processing a messages batch.
+ */
+export interface MessagesBatchResult {
+  lastMessageId: string;
+  lastMessageTs: string;
+}
+
+type BatchTask = {
+  store: Store;
+  payload: RawMessagesBatchPayload;
+  resolve: (result: MessagesBatchResult) => void;
+  reject: (error: Error) => void;
+};
+
+let batchQueue: BatchTask[] = [];
+let isProcessingBatch = false;
+
+async function processBatchQueue(): Promise<void> {
+  if (isProcessingBatch || batchQueue.length === 0) {
+    return;
+  }
+
+  isProcessingBatch = true;
+
+  while (batchQueue.length > 0) {
+    const task = batchQueue.shift()!;
+    try {
+      const result = await handleMessagesBatchInternal(task.store, task.payload);
+      task.resolve(result);
+    } catch (error) {
+      task.reject(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  isProcessingBatch = false;
 }
 
 // =============================================================================
@@ -233,22 +280,28 @@ function countClosedSessions(
 // =============================================================================
 
 /**
- * Result from processing a messages batch.
- */
-export interface MessagesBatchResult {
-  lastMessageId: string;
-  lastMessageTs: string;
-}
-
-/**
  * Handle messages event from Base.
  * Writes messages to both SQLite (source of truth) and TinyBase (UI reactivity).
+ * Queues the batch for sequential processing to avoid concurrent SQLite transactions.
  *
  * @param store - TinyBase store instance
  * @param payload - Raw messages batch payload from Base
  * @returns Result with last message info for acknowledgment
  */
 export async function handleMessagesBatch(
+  store: Store,
+  payload: RawMessagesBatchPayload
+): Promise<MessagesBatchResult> {
+  return new Promise((resolve, reject) => {
+    batchQueue.push({ store, payload, resolve, reject });
+    processBatchQueue();
+  });
+}
+
+/**
+ * Internal handler for message batches. Called by the queue processor.
+ */
+async function handleMessagesBatchInternal(
   store: Store,
   payload: RawMessagesBatchPayload
 ): Promise<MessagesBatchResult> {
@@ -282,18 +335,25 @@ export async function handleMessagesBatch(
     messageTypes: processedMessages.map((m) => m.type),
   });
 
-  // Handle permission requests BEFORE early return - they may come alone in batches
-  // without any user/assistant messages
-  updatePendingPermissions(store, rawEnvelopes);
+  // Pre-extract permission updates for early-return batches and to avoid re-walking envelopes
+  const permissionRequests = extractPermissionRequests(rawEnvelopes);
+  const resolvedToolUseIds = extractResolvedToolUseIds(rawEnvelopes);
+  const hasPermissionUpdates = permissionRequests.size > 0 || resolvedToolUseIds.size > 0;
 
   if (processedMessages.length === 0 && outputMessages.length === 0) {
     // All lines were non-message types (summary, file-history-snapshot, permission_request, etc.)
+    if (hasPermissionUpdates) {
+      updatePendingPermissions(store, permissionRequests, resolvedToolUseIds);
+    }
     return { lastMessageId: '', lastMessageTs: '' };
   }
 
   // Verify workstation exists - don't auto-create (would fail NOT NULL url constraint)
   const existingWorkstation = store.getRow('workstations', workstationId);
   if (!existingWorkstation || Object.keys(existingWorkstation).length === 0) {
+    if (hasPermissionUpdates) {
+      updatePendingPermissions(store, permissionRequests, resolvedToolUseIds);
+    }
     console.warn(`[handlers] Ignoring messages for unknown workstation: ${workstationId}`);
     return { lastMessageId: '', lastMessageTs: '' };
   }
@@ -302,22 +362,17 @@ export async function handleMessagesBatch(
   // extractProjectsFromRaw returns Map<path, ProcessedProject> - we need to generate hash IDs
   // Project IDs include workstationId to keep projects separate per workstation
   const rawProjects = extractProjectsFromRaw(rawEnvelopes);
-  let projectsCreated = 0;
-  for (const [path, project] of rawProjects) {
+  const projectIdMap = new Map<string, string>();
+  for (const path of rawProjects.keys()) {
     const projectId = await generateProjectId(workstationId, path);
-    const existingProject = store.getRow('projects', projectId);
-    if (!existingProject || Object.keys(existingProject).length === 0) {
-      store.setRow('projects', projectId, toRow({
-        ...project,
-        workstation_id: workstationId,
-        path, // Store raw path
-      }));
-      projectsCreated++;
-    }
+    projectIdMap.set(path, projectId);
   }
 
   // Get current message counts for sessions
   const existingCounts = getExistingMessageCountsFromRaw(store, rawEnvelopes);
+
+  // Extract artifacts once so we can write to SQLite before any TinyBase mutations
+  const artifacts = extractArtifactsFromRawBatch(rawEnvelopes, 'claude');
 
   // 1. Write to SQLite `messages` TABLE (source of truth) - native only
   // Include both merged messages AND output messages for closed-session reload merging
@@ -332,9 +387,35 @@ export async function handleMessagesBatch(
       outputsCount: outputMessages.length,
       messageIds: allMessagesForSQLite.map((m) => m.id),
     });
+    if (artifacts.length > 0) {
+      await writeArtifactsToSQLite(artifacts);
+      debugLog('artifacts', 'saved to SQLite', {
+        count: artifacts.length,
+        artifactIds: artifacts.map((a) => a.id),
+      });
+    }
   }
 
-  // 2. Write to TinyBase `messages` store (immediate UI reactivity)
+  // 2. Upsert projects in TinyBase (after manual SQLite writes to avoid nested transactions)
+  let projectsCreated = 0;
+  for (const [path, project] of rawProjects) {
+    const projectId = projectIdMap.get(path);
+    if (!projectId) {
+      console.error('[handlers] Missing project ID for path:', path);
+      continue;
+    }
+    const existingProject = store.getRow('projects', projectId);
+    if (!existingProject || Object.keys(existingProject).length === 0) {
+      store.setRow('projects', projectId, toRow({
+        ...project,
+        workstation_id: workstationId,
+        path, // Store raw path
+      }));
+      projectsCreated++;
+    }
+  }
+
+  // 3. Write to TinyBase `messages` store (immediate UI reactivity)
   writeProcessedMessagesToStore(store, processedMessages);
   debugLog('messages', 'saved to TinyBase', {
     batchId,
@@ -354,22 +435,24 @@ export async function handleMessagesBatch(
     });
   }
 
-  // 3. Update session metadata
+  // 4. Update session metadata
   const metadataUpdates = calculateSessionMetadataFromRaw(rawEnvelopes, existingCounts);
   updateSessionMetadata(store, metadataUpdates);
 
-  // 4. Apply session name updates from custom-title messages
+  // 5. Apply session name updates from custom-title messages
   const nameUpdates = extractSessionNameUpdates(rawEnvelopes);
   applySessionNameUpdates(store, nameUpdates);
 
-  // 5. Update session status from last message
+  // 6. Update session status from last message
   updateSessionStatus(store, rawEnvelopes);
 
-  // Note: Permission requests are handled before the early return above
-  // to ensure they work even when sent in standalone batches
+  // 7. Update pending permissions after manual SQLite writes to avoid nested transactions
+  if (hasPermissionUpdates) {
+    updatePendingPermissions(store, permissionRequests, resolvedToolUseIds);
+  }
 
-  // 6. Extract and store artifacts (todos, plans)
-  await extractAndStoreArtifacts(store, rawEnvelopes);
+  // 8. Update artifacts in TinyBase if viewing the session
+  updateArtifactsInStore(store, artifacts);
 
   // Get last message for acknowledgment
   const lastInfo = getLastMessageInfo(rawEnvelopes);
@@ -667,13 +750,11 @@ function getEnvelopeTimestamp(envelope: RawMessageEnvelope): string {
  * - Adds pending permission when type: 'permission_request' is received
  * - Clears pending permission when tool_result for that toolUseId is received
  */
-function updatePendingPermissions(store: Store, rawEnvelopes: RawMessageEnvelope[]): void {
-  // Extract permission requests from the batch
-  const permissionRequests = extractPermissionRequests(rawEnvelopes);
-
-  // Extract tool_use_ids that received results (to clear pending permissions)
-  const resolvedToolUseIds = extractResolvedToolUseIds(rawEnvelopes);
-
+function updatePendingPermissions(
+  store: Store,
+  permissionRequests: Map<string, PermissionRequestLine>,
+  resolvedToolUseIds: Map<string, Set<string>>
+): void {
   if (permissionRequests.size === 0 && resolvedToolUseIds.size === 0) {
     return;
   }
@@ -728,45 +809,30 @@ function updatePendingPermissions(store: Store, rawEnvelopes: RawMessageEnvelope
 }
 
 // =============================================================================
-// Artifact Extraction
+// Artifact Updates
 // =============================================================================
 
 /**
- * Extract artifacts from raw envelopes and store them.
- * Writes to SQLite (source of truth) and updates TinyBase if viewing the session.
+ * Update TinyBase artifacts for the active session.
+ * SQLite writes are handled earlier in the batch to avoid nested transactions.
  */
-async function extractAndStoreArtifacts(
-  store: Store,
-  rawEnvelopes: RawMessageEnvelope[]
-): Promise<void> {
-  // Extract artifacts from raw envelopes
-  const artifacts = extractArtifactsFromRawBatch(rawEnvelopes, 'claude');
-
+function updateArtifactsInStore(store: Store, artifacts: ExtractedArtifact[]): void {
   if (artifacts.length === 0) {
     return;
   }
 
-  // Write to SQLite (source of truth) - native only
-  const db = getDbInstance();
-  if (db) {
-    await writeArtifactsToSQLite(artifacts);
-    debugLog('artifacts', 'saved to SQLite', {
-      count: artifacts.length,
-      artifactIds: artifacts.map((a) => a.id),
-    });
+  const activeSessionId = store.getValue('active_session_id') as string;
+  if (!activeSessionId) {
+    return;
   }
 
-  // Update TinyBase if the session is currently being viewed
-  const activeSessionId = store.getValue('active_session_id') as string;
-  if (activeSessionId) {
-    for (const artifact of artifacts) {
-      if (artifact.sessionId === activeSessionId) {
-        upsertArtifactToStore(store, artifact);
-        debugLog('artifacts', 'updated TinyBase for active session', {
-          artifactId: artifact.id,
-          sessionId: artifact.sessionId,
-        });
-      }
+  for (const artifact of artifacts) {
+    if (artifact.sessionId === activeSessionId) {
+      upsertArtifactToStore(store, artifact);
+      debugLog('artifacts', 'updated TinyBase for active session', {
+        artifactId: artifact.id,
+        sessionId: artifact.sessionId,
+      });
     }
   }
 }
