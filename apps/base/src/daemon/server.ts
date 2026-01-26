@@ -240,7 +240,7 @@ export interface SocketServerOptions {
   /** If true, require per-client token auth instead of shared secret */
   useClientAuth?: boolean;
   onConnect?: () => void;
-  onInit?: (socketId: string, payload: InitPayload) => void;
+  onInit?: (socketId: string, payload: InitPayload) => void | Promise<void>;
   actionHandlers?: ActionHandlers;
   preferredPort?: number;
   onReady?: (port: number) => void;
@@ -252,7 +252,7 @@ export class SocketServer {
   private clients = new Map<string, ClientInfo>();
   private authenticatedSockets = new Set<string>();
   private onConnectCallback?: () => void;
-  private onInitCallback?: (socketId: string, payload: InitPayload) => void;
+  private onInitCallback?: (socketId: string, payload: InitPayload) => void | Promise<void>;
   private currentSessions: SessionData[] = [];
   private workstationId: string;
   private secret?: string;
@@ -607,6 +607,46 @@ export class SocketServer {
     }
 
     console.log(`[socket] Sent projects (${payload.projects.length} projects)`);
+  }
+
+  /**
+   * Send sessions to a specific client (encrypted if applicable).
+   */
+  sendSessionsSyncToClient(socketId: string, payload: SessionsSyncPayload): void {
+    this.currentSessions = payload.sessions;
+
+    const socket = this.io.sockets.sockets.get(socketId);
+    if (!socket || !this.authenticatedSockets.has(socketId)) return;
+
+    if (this.useClientAuth && hasEncryptionContext(socketId)) {
+      const encrypted = encryptForClient(socketId, payload);
+      if (encrypted) {
+        socket.emit("sessions", encrypted);
+      }
+    } else {
+      socket.emit("sessions", payload as unknown as EncryptedEnvelope);
+    }
+
+    console.log(`[socket] Sent sessions to ${socketId} (${payload.sessions.length} sessions)`);
+  }
+
+  /**
+   * Send projects to a specific client (encrypted if applicable).
+   */
+  sendProjectsSyncToClient(socketId: string, payload: ProjectsSyncPayload): void {
+    const socket = this.io.sockets.sockets.get(socketId);
+    if (!socket || !this.authenticatedSockets.has(socketId)) return;
+
+    if (this.useClientAuth && hasEncryptionContext(socketId)) {
+      const encrypted = encryptForClient(socketId, payload);
+      if (encrypted) {
+        socket.emit("projects", encrypted);
+      }
+    } else {
+      socket.emit("projects", payload as unknown as EncryptedEnvelope);
+    }
+
+    console.log(`[socket] Sent projects to ${socketId} (${payload.projects.length} projects)`);
   }
 
   /**

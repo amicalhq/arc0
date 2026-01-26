@@ -135,18 +135,18 @@ async function main() {
     },
   });
 
-  // Helper to send current sessions
-  const sendSessionsSync = async () => {
+  // Helper to send current sessions to a specific client
+  const sendSessionsSyncToClient = async (socketId: string) => {
     const sessions = await Promise.all(
       sessionWatcher.getActiveSessions().map(sessionFileToData)
     );
-    socketServer.sendSessionsSync({ workstationId, sessions });
+    socketServer.sendSessionsSyncToClient(socketId, { workstationId, sessions });
   };
 
-  // Helper to send all projects
-  const sendProjectsSync = () => {
+  // Helper to send all projects to a specific client
+  const sendProjectsSyncToClient = (socketId: string) => {
     const projects = projectStore.getAll();
-    socketServer.sendProjectsSync({ workstationId, projects });
+    socketServer.sendProjectsSyncToClient(socketId, { workstationId, projects });
   };
 
   // Helper to send messages for a client based on their cursor
@@ -192,12 +192,16 @@ async function main() {
     useClientAuth: hasRegisteredClients,
     actionHandlers,
     onConnect: () => {
-      // Send current sessions and projects to newly connected client
-      sendSessionsSync();
-      sendProjectsSync();
+      // Client will send init, we respond there with proper ordering
     },
-    onInit: (socketId, payload) => {
-      // Client sent init with cursor - send messages since their cursor
+    onInit: async (socketId, payload) => {
+      // 1. Sessions first (await file I/O)
+      await sendSessionsSyncToClient(socketId);
+
+      // 2. Projects second
+      sendProjectsSyncToClient(socketId);
+
+      // 3. Messages last (guaranteed order)
       const cursor = payload.cursor.map((c) => ({
         sessionId: c.sessionId,
         lastMessageTs: c.lastMessageTs,
