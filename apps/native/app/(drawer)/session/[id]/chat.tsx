@@ -18,7 +18,7 @@ import { useStoreContext } from '@/lib/store/provider';
 import type { Message, PendingPermission } from '@/lib/types/session';
 import { findLatestPendingTool, isNonInteractiveTool } from '@/lib/utils/tool-state';
 import type { ModelId, PromptMode, AnswerItem, ToolResponse } from '@arc0/types';
-import { useLocalSearchParams } from 'expo-router';
+import { useGlobalSearchParams, useLocalSearchParams } from 'expo-router';
 import { MessageSquareIcon } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Keyboard, Platform, Pressable, View } from 'react-native';
@@ -558,7 +558,7 @@ function ChatContent({ sessionId }: { sessionId: string }) {
 }
 
 export default function ChatScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useGlobalSearchParams<{ id: string }>();
 
   if (!id) {
     return (
