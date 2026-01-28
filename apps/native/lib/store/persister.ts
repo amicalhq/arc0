@@ -5,12 +5,20 @@
  */
 
 import type * as SQLite from 'expo-sqlite';
+import { Mutex } from 'async-mutex';
 
 /**
  * Direct database reference for manual queries.
  * Set by StoreProvider during initialization.
  */
 let dbInstance: SQLite.SQLiteDatabase | null = null;
+
+/**
+ * Transaction mutex to prevent nested transactions.
+ * expo-sqlite's withTransactionAsync doesn't support nesting, so we serialize
+ * all transaction requests to ensure only one runs at a time.
+ */
+const transactionMutex = new Mutex();
 
 export function setDbInstance(db: SQLite.SQLiteDatabase | null): void {
   dbInstance = db;
@@ -49,10 +57,13 @@ export async function executeStatement(
 
 /**
  * Execute multiple statements in a transaction.
+ * Uses a mutex to serialize transactions and prevent nesting errors.
  */
 export async function withTransaction(fn: () => Promise<void>): Promise<void> {
   if (!dbInstance) {
     throw new Error('Database not initialized');
   }
-  await dbInstance.withTransactionAsync(fn);
+  await transactionMutex.runExclusive(async () => {
+    await dbInstance!.withTransactionAsync(fn);
+  });
 }

@@ -1,8 +1,9 @@
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { ExternalLinkIcon, PlusIcon } from 'lucide-react-native';
-import { Image, Linking, Pressable, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
 
 interface WelcomeEmptyProps {
   /** Compact mode for drawer sidebar - reduces spacing */
@@ -19,7 +20,7 @@ export function WelcomeEmpty({ compact = false }: WelcomeEmptyProps) {
       <Image
         source={require('@/assets/images/splash-icon.png')}
         style={{ width: compact ? 60 : 80, height: compact ? 60 : 80 }}
-        resizeMode="contain"
+        contentFit="contain"
       />
 
       <View className="gap-2">

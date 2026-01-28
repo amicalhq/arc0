@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Text } from '@/components/ui/text';
 import { FontAwesome6 } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { usePathname, useRouter, useGlobalSearchParams } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
 import { type DrawerContentComponentProps } from '@react-navigation/drawer';
 import { MessageSquareIcon, PlusIcon, SettingsIcon, XIcon } from 'lucide-react-native';
-import { ActivityIndicator, Image, Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUniwind } from 'uniwind';
 
@@ -86,7 +87,7 @@ function DrawerContent(
                   : require('@/assets/images/logo-full-light.png')
               }
               style={{ width: isWeb ? 120 : 100, height: isWeb ? 36 : 30 }}
-              resizeMode="contain"
+              contentFit="contain"
             />
           </View>
           <View className="flex-row items-center gap-1">

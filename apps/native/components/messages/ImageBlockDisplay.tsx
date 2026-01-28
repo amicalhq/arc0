@@ -1,6 +1,7 @@
 import { Text } from '@/components/ui/text';
 import type { ImageBlock } from '@/lib/types/session';
-import { Image, View } from 'react-native';
+import { Image } from 'expo-image';
+import { View } from 'react-native';
 
 interface ImageBlockDisplayProps {
   block: ImageBlock;
@@ -18,7 +19,7 @@ export function ImageBlockDisplay({ block }: ImageBlockDisplayProps) {
         <Image
           source={{ uri }}
           style={{ width: '100%', height: 200 }}
-          resizeMode="contain"
+          contentFit="contain"
         />
       </View>
     </View>

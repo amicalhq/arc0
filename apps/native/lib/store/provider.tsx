@@ -16,6 +16,7 @@ import { CriticalErrorFallback } from '@/components/ErrorFallback';
 import { resolveTheme, type ThemePreference } from './core';
 import { runMigrations } from './migrations/runner';
 import { setDbInstance } from './persister';
+import { Persister } from 'tinybase/persisters';
 
 interface StoreContextValue {
   isReady: boolean;
@@ -130,7 +131,7 @@ export function StoreProvider({ children }: StoreProviderProps) {
   }, []);
 
   useEffect(() => {
-    let persister: any = null;
+    let persister: Persister | null = null;
     let themeListenerId: string | null = null;
     let appearanceSubscription: ReturnType<typeof Appearance.addChangeListener> | null = null;
 
@@ -165,6 +166,13 @@ export function StoreProvider({ children }: StoreProviderProps) {
           const database = await SQLite.openDatabaseAsync('arc0.db');
           setDb(database);
           setDbInstance(database); // Make available for direct queries
+
+          // Configure SQLite for lower memory usage
+          await database.execAsync(`
+            PRAGMA cache_size = -20000;
+            PRAGMA synchronous = NORMAL;
+            PRAGMA temp_store = FILE;
+          `);
 
           // Run migrations FIRST (before persister)
           await runMigrations(database);
