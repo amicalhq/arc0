@@ -507,18 +507,31 @@ function getExistingMessageCountsFromRaw(
  * Uses INSERT ... ON CONFLICT to preserve created_at and update updated_at.
  */
 async function writeProcessedMessagesToSQLite(messages: ProcessedMessage[]): Promise<void> {
+  if (messages.length === 0) return;
+
+  const columns =
+    '(id, session_id, parent_id, type, timestamp, content, stop_reason, usage, raw_json)';
+  const valuesPerRow = 9;
+  // Stay safely under SQLite variable limits across platforms.
+  const maxRowsPerInsert = Math.max(1, Math.floor(900 / valuesPerRow));
+
   await withTransaction(async () => {
-    for (const msg of messages) {
-      await executeStatement(
-        `INSERT INTO messages (id, session_id, parent_id, type, timestamp, content, stop_reason, usage, raw_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    for (let i = 0; i < messages.length; i += maxRowsPerInsert) {
+      const chunk = messages.slice(i, i + maxRowsPerInsert);
+      const placeholders = chunk
+        .map(() => `(${new Array(valuesPerRow).fill('?').join(', ')})`)
+        .join(', ');
+      const sql = `INSERT INTO messages ${columns}
+         VALUES ${placeholders}
          ON CONFLICT(id) DO UPDATE SET
            content = excluded.content,
            stop_reason = excluded.stop_reason,
            usage = excluded.usage,
            raw_json = excluded.raw_json,
-           updated_at = datetime('now')`,
-        [
+           updated_at = datetime('now')`;
+      const params: Array<string | number | null> = [];
+      for (const msg of chunk) {
+        params.push(
           msg.id,
           msg.session_id,
           msg.parent_id,
@@ -527,9 +540,12 @@ async function writeProcessedMessagesToSQLite(messages: ProcessedMessage[]): Pro
           msg.content,
           msg.stop_reason,
           msg.usage,
-          msg.raw_json,
-        ]
-      );
+          msg.raw_json
+        );
+      }
+      await executeStatement(sql, params);
+      // Yield to keep the UI responsive during large syncs.
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
   });
 }
