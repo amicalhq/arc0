@@ -4,6 +4,7 @@
  */
 
 import * as Crypto from 'expo-crypto';
+import { Platform } from 'react-native';
 import type { Row, Store } from 'tinybase';
 import type { RawMessageEnvelope, RawMessagesBatchPayload } from '@arc0/types';
 import type { SessionData, SessionsSyncPayload } from '../socket/types';
@@ -415,33 +416,45 @@ async function handleMessagesBatchInternal(
     }
   }
 
-  // 3. Write only active session messages to TinyBase (UI reactivity)
+  // 3. Write messages to TinyBase (UI reactivity)
+  // Web: Write ALL messages (OPFS persists entire TinyBase store, no SQLite fallback)
+  // Native: Write only active session messages (SQLite has all messages, loaded on-demand)
   const activeSessionId = store.getValue('active_session_id') as string | undefined;
-  const activeMessages = activeSessionId
-    ? processedMessages.filter((m) => m.session_id === activeSessionId)
-    : [];
-  if (activeMessages.length > 0) {
-    writeProcessedMessagesToStore(store, activeMessages);
+  const messagesToWrite =
+    Platform.OS === 'web'
+      ? processedMessages
+      : activeSessionId
+        ? processedMessages.filter((m) => m.session_id === activeSessionId)
+        : [];
+  if (messagesToWrite.length > 0) {
+    writeProcessedMessagesToStore(store, messagesToWrite);
   }
-  debugLog('messages', 'saved to TinyBase (active only)', {
+  debugLog('messages', 'saved to TinyBase', {
     batchId,
-    count: activeMessages.length,
+    count: messagesToWrite.length,
     activeSessionId,
+    platform: Platform.OS,
   });
 
-  // 2b. Merge late-arriving (orphaned) outputs into existing command rows in TinyBase
+  // 3b. Merge late-arriving (orphaned) outputs into existing command rows in TinyBase
   // This handles outputs that arrive in a different batch than their parent command
   // NOTE: We only merge orphanedOutputs, NOT all outputMessages, to avoid duplicating
   // outputs that were already merged in-batch by transformRawBatchWithOutputs
-  const activeOrphanedOutputs = activeSessionId
-    ? orphanedOutputs.filter((m) => m.session_id === activeSessionId)
-    : [];
-  if (activeOrphanedOutputs.length > 0) {
-    mergeOutputsIntoExistingCommands(store, activeOrphanedOutputs);
+  // Web: Merge all orphaned outputs (no SQLite fallback)
+  // Native: Only merge for active session
+  const orphanedOutputsToMerge =
+    Platform.OS === 'web'
+      ? orphanedOutputs
+      : activeSessionId
+        ? orphanedOutputs.filter((m) => m.session_id === activeSessionId)
+        : [];
+  if (orphanedOutputsToMerge.length > 0) {
+    mergeOutputsIntoExistingCommands(store, orphanedOutputsToMerge);
     debugLog('messages', 'merged orphaned outputs into existing commands', {
       batchId,
-      orphanedCount: activeOrphanedOutputs.length,
+      orphanedCount: orphanedOutputsToMerge.length,
       activeSessionId,
+      platform: Platform.OS,
     });
   }
 
@@ -839,7 +852,9 @@ function updatePendingPermissions(
 // =============================================================================
 
 /**
- * Update TinyBase artifacts for the active session.
+ * Update TinyBase artifacts.
+ * Web: Write all artifacts (OPFS persists entire store)
+ * Native: Write only active session artifacts (loaded on-demand from SQLite)
  * SQLite writes are handled earlier in the batch to avoid nested transactions.
  */
 function updateArtifactsInStore(store: Store, artifacts: ExtractedArtifact[]): void {
@@ -848,16 +863,16 @@ function updateArtifactsInStore(store: Store, artifacts: ExtractedArtifact[]): v
   }
 
   const activeSessionId = store.getValue('active_session_id') as string;
-  if (!activeSessionId) {
-    return;
-  }
 
   for (const artifact of artifacts) {
-    if (artifact.sessionId === activeSessionId) {
+    // Web: Write all artifacts (no SQLite fallback)
+    // Native: Only write for active session (loaded from SQLite on demand)
+    if (Platform.OS === 'web' || artifact.sessionId === activeSessionId) {
       upsertArtifactToStore(store, artifact);
-      debugLog('artifacts', 'updated TinyBase for active session', {
+      debugLog('artifacts', 'updated TinyBase', {
         artifactId: artifact.id,
         sessionId: artifact.sessionId,
+        platform: Platform.OS,
       });
     }
   }

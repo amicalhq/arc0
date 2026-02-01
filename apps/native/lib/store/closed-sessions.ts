@@ -3,6 +3,7 @@
  * Loads messages for closed sessions from SQLite on demand.
  */
 
+import { Platform } from 'react-native';
 import type { Indexes, Store } from 'tinybase';
 import { executeQuery } from './persister';
 
@@ -315,6 +316,8 @@ export function unloadSessionMessages(
  * Unload messages for the previous active session when switching sessions.
  * Unloads ALL sessions (both open and closed) - only active route keeps messages.
  *
+ * NOTE: Only applies to native. On web, all messages stay in TinyBase (persisted to OPFS).
+ *
  * @param store - TinyBase store instance
  * @param indexes - TinyBase indexes instance
  * @param previousSessionId - Session ID that was previously active
@@ -326,6 +329,11 @@ export function handleActiveSessionChange(
   previousSessionId: string,
   currentSessionId: string
 ): void {
+  // Skip on web - OPFS persists entire TinyBase store, unloading would lose messages
+  if (Platform.OS === 'web') {
+    return;
+  }
+
   if (!previousSessionId || previousSessionId === currentSessionId) {
     return;
   }
