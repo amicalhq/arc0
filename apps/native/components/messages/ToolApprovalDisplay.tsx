@@ -109,10 +109,10 @@ export function ToolApprovalDisplay({
     <View>
       {/* Tool info */}
       <View className="mb-3">
-        <Text className="text-foreground text-sm font-medium">
+        <Text className="text-foreground text-sm font-medium font-mono">
           Allow {toolName}?
         </Text>
-        <Text className="text-muted-foreground mt-1 text-xs" numberOfLines={2}>
+        <Text className="text-muted-foreground mt-1 text-xs font-mono" numberOfLines={2}>
           {description}
         </Text>
       </View>

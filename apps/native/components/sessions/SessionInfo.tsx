@@ -57,14 +57,14 @@ export function SessionInfo({ session, size = 'default', context = 'list' }: Ses
         {/* Project & Branch */}
         <View className="-mt-0.5 flex-row items-center">
           <Icon as={Folder} className={metaIconClass} />
-          <Text className={`ml-1 ${metaTextClass}`} numberOfLines={1}>
+          <Text className={`ml-1 font-mono ${metaTextClass}`} numberOfLines={1}>
             {truncatePath(session.projectName, pathMaxLength)}
           </Text>
           {session.gitBranch ? (
             <>
               <Text className={`mx-1.5 ${metaTextClass}`}>·</Text>
               <Icon as={GitBranch} className={metaIconClass} />
-              <Text className={`ml-1 flex-1 ${metaTextClass}`} numberOfLines={1}>
+              <Text className={`ml-1 flex-1 font-mono ${metaTextClass}`} numberOfLines={1}>
                 {session.gitBranch}
               </Text>
             </>

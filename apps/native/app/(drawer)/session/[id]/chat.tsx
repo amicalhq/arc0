@@ -529,7 +529,7 @@ function ChatContent({ sessionId }: { sessionId: string }) {
             <Text className="text-muted-foreground">Loading messages...</Text>
           </Pressable>
         ) : messages.length > 0 ? (
-          <MessageList messages={messages} />
+          <MessageList messages={messages} providerId={session?.providerId} />
         ) : (
           <Pressable
             className="flex-1 items-center justify-center gap-4 p-6"

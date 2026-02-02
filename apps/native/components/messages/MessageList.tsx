@@ -21,6 +21,7 @@ import { ToolCallBlock } from './ToolCallBlock';
 
 interface MessageListProps {
   messages: RenderableMessage[];
+  providerId?: string;
 }
 
 interface ContentBlockRendererProps {
@@ -29,12 +30,13 @@ interface ContentBlockRendererProps {
   toolResults: Map<string, ToolResultWithMetadata>;
   isInProgress?: boolean;
   isLastMessage?: boolean;
+  providerId?: string;
 }
 
-function ContentBlockRenderer({ block, isUser, toolResults, isInProgress, isLastMessage }: ContentBlockRendererProps) {
+function ContentBlockRenderer({ block, isUser, toolResults, isInProgress, isLastMessage, providerId }: ContentBlockRendererProps) {
   switch (block.type) {
     case 'text':
-      return isUser ? <UserMessage text={block.text} /> : <AssistantMessage text={block.text} />;
+      return isUser ? <UserMessage text={block.text} /> : <AssistantMessage text={block.text} providerId={providerId} />;
     case 'thinking':
       return <ThinkingBlockDisplay thinking={block.thinking} isInProgress={isInProgress} />;
     case 'tool_use': {
@@ -88,6 +90,7 @@ interface RenderableItemProps {
   message?: RenderableMessage;
   toolResults: Map<string, ToolResultWithMetadata>;
   isLastMessage?: boolean;
+  providerId?: string;
 }
 
 /**
@@ -100,6 +103,7 @@ const RenderableItem = React.memo(function RenderableItem({
   message: directMessage,
   toolResults,
   isLastMessage,
+  providerId,
 }: RenderableItemProps) {
   // For TinyBase messages, fetch reactively via useMessage
   // This ensures updates to stdout/stderr trigger re-renders
@@ -151,6 +155,7 @@ const RenderableItem = React.memo(function RenderableItem({
             toolResults={toolResults}
             isInProgress={message.isInProgress}
             isLastMessage={isLastMessage}
+            providerId={providerId}
           />
         ))}
       </View>
@@ -164,7 +169,7 @@ function ItemSeparator() {
   return <View className="h-2" />;
 }
 
-export function MessageList({ messages }: MessageListProps) {
+export function MessageList({ messages, providerId }: MessageListProps) {
   const listRef = useRef<FlashListRef<RenderableMessage>>(null);
   const scrollContext = useScrollToMessageSafe();
 
@@ -253,6 +258,7 @@ export function MessageList({ messages }: MessageListProps) {
             message={item}
             toolResults={toolResults}
             isLastMessage={isLast}
+            providerId={providerId}
           />
         );
       }
@@ -264,13 +270,14 @@ export function MessageList({ messages }: MessageListProps) {
             messageId={item.uuid}
             toolResults={toolResults}
             isLastMessage={isLast}
+            providerId={providerId}
           />
         );
       }
 
       return null;
     },
-    [visibleMessages.length, toolResults]
+    [visibleMessages.length, toolResults, providerId]
   );
 
   return (

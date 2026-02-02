@@ -318,9 +318,9 @@ export function ToolCallBlock({ name, input, result, isError, metadata, interact
   const isPending = !hasResult;
 
   return (
-    <View className="rounded-sm border border-border bg-card overflow-hidden">
+    <View className="rounded-sm border border-border bg-background overflow-hidden">
       <Collapsible open={isOpen} onOpenChange={handleOpenChange}>
-        <CollapsibleTrigger className="flex-row items-center gap-2 px-3 py-2">
+        <CollapsibleTrigger className="flex-row items-center gap-2 px-2.5 py-1.5">
           <Shimmer isShimmering={isPending}>
             <Icon as={ToolIcon} className={cn('size-4', iconColor)} />
           </Shimmer>
@@ -329,7 +329,7 @@ export function ToolCallBlock({ name, input, result, isError, metadata, interact
               <Text className="text-sm font-medium text-foreground">{name}</Text>
             </Shimmer>
             {description && (
-              <Text className="flex-1 text-xs text-muted-foreground" numberOfLines={1}>
+              <Text className="flex-1 text-sm text-muted-foreground font-mono" numberOfLines={1}>
                 {description}
               </Text>
             )}
@@ -345,7 +345,7 @@ export function ToolCallBlock({ name, input, result, isError, metadata, interact
           />
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <View className="gap-2 border-t border-border bg-muted/30 px-3 py-2">
+          <View className="gap-2 border-t border-border bg-muted/30 px-2.5 py-1.5">
           {/* Input - custom renderers for specific tools */}
           <View>
             <Text className="mb-1 text-xs font-medium text-muted-foreground">Input</Text>

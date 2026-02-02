@@ -85,7 +85,7 @@ export function SessionStatusBadge({ status, statusDetail }: SessionStatusBadgeP
   const content = (
     <View className="flex-row items-center">
       <Icon as={config.icon} className={`size-3.5 ${config.colorClass}`} />
-      <Text className={`ml-1.5 text-xs ${config.colorClass}`} numberOfLines={1}>
+      <Text className={`ml-1.5 text-xs font-mono ${config.colorClass}`} numberOfLines={1}>
         {statusDetail}
       </Text>
     </View>

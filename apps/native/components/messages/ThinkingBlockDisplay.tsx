@@ -19,9 +19,9 @@ export function ThinkingBlockDisplay({ thinking, isInProgress = false }: Thinkin
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <View className="rounded-sm border border-border bg-card overflow-hidden">
+    <View className="rounded-sm border border-border bg-background overflow-hidden">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CollapsibleTrigger className="flex-row items-center gap-2 px-3 py-2">
+        <CollapsibleTrigger className="flex-row items-center gap-2 px-2.5 py-1.5">
           <Shimmer isShimmering={isInProgress}>
             <Icon as={BrainIcon} className="size-4 text-muted-foreground" />
           </Shimmer>
@@ -36,7 +36,7 @@ export function ThinkingBlockDisplay({ thinking, isInProgress = false }: Thinkin
           />
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <View className="border-t border-border bg-muted/30 px-3 py-2">
+          <View className="border-t border-border bg-muted/30 px-2.5 py-1.5">
             <Text className="text-sm italic text-muted-foreground leading-relaxed">
               {thinking || 'Processing...'}
             </Text>

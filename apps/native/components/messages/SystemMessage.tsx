@@ -5,7 +5,7 @@ import {
   AlertCircleIcon,
   RefreshCwIcon,
   ScissorsIcon,
-  TerminalIcon,
+  UserIcon,
 } from 'lucide-react-native';
 import { View } from 'react-native';
 
@@ -68,18 +68,18 @@ function LocalCommandDisplay({ message }: { message: SystemMessageType }) {
   const hasOutput = stdout || stderr;
 
   return (
-    <View className="rounded-sm border border-border bg-muted/50 px-3 py-2">
+    <View className="rounded-sm border border-border bg-primary px-2.5 py-1.5">
       <View className="flex-row items-center gap-2">
-        <Icon as={TerminalIcon} className="size-4 text-muted-foreground" />
-        <Text className="text-sm font-mono font-medium text-foreground">{commandName}</Text>
+        <Icon as={UserIcon} size={16} className="text-primary-foreground" />
+        <Text className="text-sm font-mono font-medium text-primary-foreground">{commandName}</Text>
         {commandArgs ? (
-          <Text className="text-sm font-mono text-muted-foreground">{commandArgs}</Text>
+          <Text className="text-sm font-mono text-primary-foreground/70">{commandArgs}</Text>
         ) : null}
       </View>
       {hasOutput ? (
-        <View className="mt-2 border-t border-border pt-2">
+        <View className="mt-2 border-t border-primary-foreground/20 pt-2">
           {stdout ? (
-            <Text className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">
+            <Text className="text-xs font-mono text-primary-foreground/70 whitespace-pre-wrap">
               {stdout}
             </Text>
           ) : null}
