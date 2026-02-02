@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useGlobalSearchParams, useRouter } from 'expo-router';
 import { ExternalLinkIcon, FileCodeIcon, PickaxeIcon, MapIcon } from 'lucide-react-native';
 import { useIndexes, useStore } from 'tinybase/ui-react';
 
@@ -14,7 +14,7 @@ import { useArtifacts } from '@/lib/store/useArtifacts';
 import { unloadSessionArtifacts } from '@/lib/store/artifacts-loader';
 
 export default function ArtifactsScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useGlobalSearchParams<{ id: string }>();
   const router = useRouter();
   const store = useStore();
   const indexes = useIndexes();
