@@ -34,7 +34,7 @@ import {
 } from '../socket/artifact-extractor';
 import { executeStatement, getDbInstance, withTransaction } from './persister';
 import { upsertArtifactToStore, writeArtifactsToSQLite } from './artifacts-loader';
-import { computeSessionStatus } from './status';
+import { computeSessionStatus } from './session-status';
 
 // =============================================================================
 // Debug Logging
@@ -712,12 +712,14 @@ function applySessionNameUpdates(store: Store, updates: SessionNameUpdate[]): vo
 }
 
 /**
- * Update session status based on the last message in each session.
- * Analyzes assistant messages to determine current session state.
+ * Update session status based on the last messages in each session.
+ * Analyzes both user and assistant messages to determine current session state.
+ * Key insight: User message with tool_result means a tool is executing → 'working'.
  */
 function updateSessionStatus(store: Store, rawEnvelopes: RawMessageEnvelope[]): void {
-  // Group envelopes by session and find the last user/assistant message for each
-  const lastEnvelopeBySession = new Map<string, RawMessageEnvelope>();
+  // Group envelopes by session, tracking last user AND last assistant separately
+  const lastUserBySession = new Map<string, RawMessageEnvelope>();
+  const lastAssistantBySession = new Map<string, RawMessageEnvelope>();
 
   for (const envelope of rawEnvelopes) {
     const payload = envelope.payload as Record<string, unknown>;
@@ -729,47 +731,73 @@ function updateSessionStatus(store: Store, rawEnvelopes: RawMessageEnvelope[]): 
       continue;
     }
 
-    const existing = lastEnvelopeBySession.get(envelope.sessionId);
+    const targetMap = msgType === 'user' ? lastUserBySession : lastAssistantBySession;
+    const existing = targetMap.get(envelope.sessionId);
     if (!existing) {
-      lastEnvelopeBySession.set(envelope.sessionId, envelope);
+      targetMap.set(envelope.sessionId, envelope);
     } else {
       // Compare timestamps to find the latest
       const existingTs = getEnvelopeTimestamp(existing);
       const currentTs = getEnvelopeTimestamp(envelope);
       if (currentTs >= existingTs) {
-        lastEnvelopeBySession.set(envelope.sessionId, envelope);
+        targetMap.set(envelope.sessionId, envelope);
       }
     }
   }
 
+  // Get all session IDs that have either user or assistant messages
+  const sessionIds = new Set([
+    ...lastUserBySession.keys(),
+    ...lastAssistantBySession.keys(),
+  ]);
+
   store.transaction(() => {
-    for (const [sessionId, envelope] of lastEnvelopeBySession) {
-      const payload = envelope.payload as Record<string, unknown>;
-      const msgType = payload.type as string;
+    for (const sessionId of sessionIds) {
+      const userEnvelope = lastUserBySession.get(sessionId);
+      const assistantEnvelope = lastAssistantBySession.get(sessionId);
 
       // Check if session is open
       const session = store.getRow('sessions', sessionId);
       const isOpen = Number(session?.open) === 1;
 
-      // Parse content blocks
-      let contentBlocks: ContentBlock[] = [];
-      if (payload.message && typeof payload.message === 'object') {
-        const message = payload.message as Record<string, unknown>;
-        if (Array.isArray(message.content)) {
-          contentBlocks = message.content as ContentBlock[];
+      // Parse user message content blocks and timestamp
+      let userContentBlocks: ContentBlock[] | undefined;
+      let userTimestamp: string | undefined;
+      if (userEnvelope) {
+        const payload = userEnvelope.payload as Record<string, unknown>;
+        userTimestamp = getEnvelopeTimestamp(userEnvelope);
+        if (payload.message && typeof payload.message === 'object') {
+          const message = payload.message as Record<string, unknown>;
+          if (Array.isArray(message.content)) {
+            userContentBlocks = message.content as ContentBlock[];
+          }
         }
       }
 
-      // Get stop_reason
-      const stopReason = payload.message
-        ? ((payload.message as Record<string, unknown>).stop_reason as string | undefined)
-        : undefined;
+      // Parse assistant message content blocks, stop_reason, and timestamp
+      let assistantContentBlocks: ContentBlock[] | undefined;
+      let stopReason: string | null | undefined;
+      let assistantTimestamp: string | undefined;
+      if (assistantEnvelope) {
+        const payload = assistantEnvelope.payload as Record<string, unknown>;
+        assistantTimestamp = getEnvelopeTimestamp(assistantEnvelope);
+        if (payload.message && typeof payload.message === 'object') {
+          const message = payload.message as Record<string, unknown>;
+          if (Array.isArray(message.content)) {
+            assistantContentBlocks = message.content as ContentBlock[];
+          }
+          stopReason = message.stop_reason as string | undefined;
+        }
+      }
 
-      // Compute status
+      // Compute status using consolidated function
       const statusInfo = computeSessionStatus({
-        type: msgType,
-        contentBlocks,
-        stopReason,
+        lastAssistantMsg: assistantContentBlocks
+          ? { contentBlocks: assistantContentBlocks, stopReason, timestamp: assistantTimestamp ?? '' }
+          : undefined,
+        lastUserMsg: userContentBlocks
+          ? { contentBlocks: userContentBlocks, timestamp: userTimestamp ?? '' }
+          : undefined,
         isOpen,
       });
 

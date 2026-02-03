@@ -1,4 +1,4 @@
-import type { SessionStatus } from './session-status';
+import type { SessionStatus } from '@/lib/store/session-status';
 
 /**
  * Pending permission request from daemon.

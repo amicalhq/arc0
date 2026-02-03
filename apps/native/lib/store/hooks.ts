@@ -23,7 +23,7 @@ import type {
   SystemMessage as SystemMessageType,
   SystemMessageSubtype,
 } from '@/lib/types/session';
-import type { SessionStatus, StatusInfo } from '@/lib/types/session-status';
+import { type SessionStatus, type StatusInfo, isAnimatedStatus } from './session-status';
 import { useUserActionsSafe } from '@/lib/contexts/UserActionsContext';
 import { loadSessionMessages } from './closed-sessions';
 import type { ThemePreference } from './core';
@@ -398,11 +398,10 @@ export function useEffectiveSessionStatus(session: Session): StatusInfo {
 
     // If no actions context (outside provider), fall back to message-based status
     if (!actionsContext) {
-      const animatedStatuses = ['sending', 'submitting', 'thinking', 'working'];
       return {
         status: session.status,
         label: session.statusDetail,
-        isAnimated: animatedStatuses.includes(session.status),
+        isAnimated: isAnimatedStatus(session.status),
       };
     }
 
@@ -419,11 +418,10 @@ export function useEffectiveSessionStatus(session: Session): StatusInfo {
     }
 
     // Fall back to message-based status from session
-    const animatedStatuses = ['sending', 'submitting', 'thinking', 'working'];
     return {
       status: session.status,
       label: session.statusDetail,
-      isAnimated: animatedStatuses.includes(session.status),
+      isAnimated: isAnimatedStatus(session.status),
     };
   }, [session.id, session.status, session.statusDetail, actionsContext]);
 }

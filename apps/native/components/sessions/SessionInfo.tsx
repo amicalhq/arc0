@@ -7,7 +7,7 @@ import { ProviderIcon } from './ProviderIcon';
 import { truncatePath } from '@/lib/utils/path';
 import { formatFirstMessageForDisplay } from '@/lib/utils/session-display';
 import { useEffectiveSessionStatus } from '@/lib/store/hooks';
-import { STATUS_COLORS } from '@/lib/utils/status-indicator';
+import { STATUS_COLORS } from '@/lib/store/session-status';
 import { formatRelativeTimeShort } from '@/lib/utils/time';
 
 interface SessionInfoProps {

@@ -10,7 +10,7 @@ import { useEffectiveSessionStatus } from '@/lib/store/hooks';
 import { formatRelativeTimeShort } from '@/lib/utils/time';
 import { truncatePath } from '@/lib/utils/path';
 import { formatFirstMessageForDisplay } from '@/lib/utils/session-display';
-import { STATUS_COLORS, isAnimatedStatus } from '@/lib/utils/status-indicator';
+import { STATUS_COLORS, isAnimatedStatus } from '@/lib/store/session-status';
 
 interface SessionCardProps {
   session: Session;
