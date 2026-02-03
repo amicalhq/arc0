@@ -143,6 +143,7 @@ function ChatContent({ sessionId }: { sessionId: string }) {
   const { isReady } = useStoreContext();
   const { messages, isLoadingMessages } = useMessages(sessionId);
   const session = useSession(sessionId);
+  const isSessionInteractive = session?.interactive !== false;
   const [inputText, setInputText] = useState('');
   const [mode, setMode] = useState<PromptMode>('default');
   const [model, setModel] = useState<ModelId>('default');
@@ -222,6 +223,12 @@ function ChatContent({ sessionId }: { sessionId: string }) {
 
   // Determine placeholder text
   const placeholder = useMemo(() => {
+    if (!isSessionInteractive) {
+      return pendingTool
+        ? 'Non-interactive session — respond in tmux'
+        : 'Non-interactive session — use tmux';
+    }
+
     if (pendingTool?.type === 'ExitPlanMode') {
       if (planApprovalSelection) {
         const option = PLAN_APPROVAL_OPTIONS.find((o) => o.value === planApprovalSelection);
@@ -269,6 +276,7 @@ function ChatContent({ sessionId }: { sessionId: string }) {
     pendingTool,
     planApprovalSelection,
     toolApprovalSelection,
+    isSessionInteractive,
   ]);
 
   // Handle text input change
@@ -298,6 +306,7 @@ function ChatContent({ sessionId }: { sessionId: string }) {
 
   // Handle submit
   const handleSubmit = async () => {
+    if (!isSessionInteractive) return;
     const lastMsg = getLastMessageInfo(userAssistantMessages);
 
     setIsSubmitting(true);
@@ -479,6 +488,7 @@ function ChatContent({ sessionId }: { sessionId: string }) {
 
   // Determine if we can submit
   const canSubmit = useMemo(() => {
+    if (!isSessionInteractive) return false;
     if (isSubmitting || contextIsSubmitting) return false;
 
     // For ExitPlanMode
@@ -515,6 +525,7 @@ function ChatContent({ sessionId }: { sessionId: string }) {
     inputText,
     isSubmitting,
     contextIsSubmitting,
+    isSessionInteractive,
   ]);
 
   // Handle key press for web (Enter to submit, Shift+Enter for newline)
@@ -543,7 +554,11 @@ function ChatContent({ sessionId }: { sessionId: string }) {
             <Text className="text-muted-foreground">Loading messages...</Text>
           </Pressable>
         ) : messages.length > 0 ? (
-          <MessageList messages={messages} providerId={session?.providerId} />
+          <MessageList
+            messages={messages}
+            providerId={session?.providerId}
+            interactiveEnabled={isSessionInteractive}
+          />
         ) : (
           <Pressable
             className="flex-1 items-center justify-center gap-4 p-6"
@@ -557,6 +572,14 @@ function ChatContent({ sessionId }: { sessionId: string }) {
       </View>
 
       {/* Prompt input */}
+      {!isSessionInteractive && (
+        <View className="border-border bg-muted/40 mx-2 mb-2 rounded-sm border px-3 py-2">
+          <Text className="text-muted-foreground text-xs">
+            This session is non-interactive. Use tmux on the workstation to respond to prompts and
+            permissions.
+          </Text>
+        </View>
+      )}
       <PromptInput
         value={inputText}
         onChangeText={handleTextChange}
@@ -567,7 +590,7 @@ function ChatContent({ sessionId }: { sessionId: string }) {
         onSubmit={handleSubmit}
         canSubmit={canSubmit}
         isSubmitting={contextIsSubmitting}
-        editable={!isSubmitting && !contextIsSubmitting}
+        editable={isSessionInteractive && !isSubmitting && !contextIsSubmitting}
         mode={mode}
         onModeChange={setMode}
         model={model}

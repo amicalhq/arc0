@@ -235,6 +235,7 @@ function upsertSession(
   projectId?: string
 ): void {
   const existing = store.getRow('sessions', session.id);
+  const interactive = session.interactive === false ? 0 : 1;
 
   if (existing && Object.keys(existing).length > 0) {
     // Update existing - preserves name, first_message, message_count, etc.
@@ -245,6 +246,7 @@ function upsertSession(
       git_branch: session.gitBranch ?? '',
       started_at: session.startedAt,
       open: 1,
+      interactive,
       workstation_id: workstationId,
     });
   } else {
@@ -257,6 +259,7 @@ function upsertSession(
       git_branch: session.gitBranch ?? '',
       started_at: session.startedAt,
       open: 1,
+      interactive,
       workstation_id: workstationId,
       provider: 'claude',
       message_count: 0,

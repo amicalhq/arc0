@@ -50,6 +50,7 @@ interface SessionRow {
   message_count?: number;
   last_message_at?: string;
   open?: number; // 1 = open, 0 = closed
+  interactive?: number; // 1 = interactive, 0 = read-only
   status?: string; // SessionStatus type
   status_detail?: string; // Human-readable status label
   pending_permission?: string; // JSON string of PendingPermission or empty
@@ -115,6 +116,7 @@ function transformSession(id: string, row: SessionRow, projectPath?: string): Se
     gitBranch: row.git_branch ?? null,
     startedAt: row.started_at ?? new Date().toISOString(),
     endedAt: row.ended_at ?? null,
+    interactive: row.interactive === undefined ? true : Number(row.interactive) === 1,
     messageCount: row.message_count ?? 0,
     lastMessageAt: row.last_message_at ?? null,
     status: (row.status as SessionStatus) ?? 'idle',

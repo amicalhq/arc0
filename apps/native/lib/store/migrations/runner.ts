@@ -3,6 +3,7 @@ import type * as SQLite from 'expo-sqlite';
 import * as migration001 from './001_initial_schema';
 import * as migration002 from './002_add_session_status';
 import * as migration003 from './003_add_artifacts';
+import * as migration004 from './004_add_session_interactive';
 
 interface Migration {
   version: number;
@@ -11,7 +12,7 @@ interface Migration {
 }
 
 // Register all migrations in order
-const migrations: Migration[] = [migration001, migration002, migration003];
+const migrations: Migration[] = [migration001, migration002, migration003, migration004];
 
 /**
  * Run all pending migrations.

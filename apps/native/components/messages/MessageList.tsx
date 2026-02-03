@@ -26,6 +26,8 @@ import { ToolCallBlock } from './ToolCallBlock';
 interface MessageListProps {
   messages: RenderableMessage[];
   providerId?: string;
+  /** Whether the client can send interactive responses (e.g. tmux-backed session). */
+  interactiveEnabled?: boolean;
 }
 
 interface ContentBlockRendererProps {
@@ -35,6 +37,7 @@ interface ContentBlockRendererProps {
   isInProgress?: boolean;
   isLastMessage?: boolean;
   providerId?: string;
+  interactiveEnabled?: boolean;
 }
 
 function ContentBlockRenderer({
@@ -44,6 +47,7 @@ function ContentBlockRenderer({
   isInProgress,
   isLastMessage,
   providerId,
+  interactiveEnabled,
 }: ContentBlockRendererProps) {
   switch (block.type) {
     case 'text':
@@ -62,7 +66,8 @@ function ContentBlockRenderer({
       // - TodoWrite, EnterPlanMode: NOT interactive (no user input needed)
       const isPending = !result;
       const isNonInteractive = isNonInteractiveTool(block.name);
-      const isInteractive = isLastMessage && isPending && !isNonInteractive;
+      const isInteractive =
+        (interactiveEnabled ?? true) && isLastMessage && isPending && !isNonInteractive;
       return (
         <ToolCallBlock
           name={block.name}
@@ -106,6 +111,7 @@ interface RenderableItemProps {
   toolResults: Map<string, ToolResultWithMetadata>;
   isLastMessage?: boolean;
   providerId?: string;
+  interactiveEnabled?: boolean;
 }
 
 /**
@@ -119,6 +125,7 @@ const RenderableItem = React.memo(function RenderableItem({
   toolResults,
   isLastMessage,
   providerId,
+  interactiveEnabled,
 }: RenderableItemProps) {
   // For TinyBase messages, fetch reactively via useMessage
   // This ensures updates to stdout/stderr trigger re-renders
@@ -171,6 +178,7 @@ const RenderableItem = React.memo(function RenderableItem({
             isInProgress={message.isInProgress}
             isLastMessage={isLastMessage}
             providerId={providerId}
+            interactiveEnabled={interactiveEnabled}
           />
         ))}
       </View>
@@ -184,7 +192,7 @@ function ItemSeparator() {
   return <View className="h-2" />;
 }
 
-export function MessageList({ messages, providerId }: MessageListProps) {
+export function MessageList({ messages, providerId, interactiveEnabled }: MessageListProps) {
   const listRef = useRef<FlashListRef<RenderableMessage>>(null);
   const scrollContext = useScrollToMessageSafe();
 
@@ -274,6 +282,7 @@ export function MessageList({ messages, providerId }: MessageListProps) {
             toolResults={toolResults}
             isLastMessage={isLast}
             providerId={providerId}
+            interactiveEnabled={interactiveEnabled}
           />
         );
       }
@@ -286,13 +295,14 @@ export function MessageList({ messages, providerId }: MessageListProps) {
             toolResults={toolResults}
             isLastMessage={isLast}
             providerId={providerId}
+            interactiveEnabled={interactiveEnabled}
           />
         );
       }
 
       return null;
     },
-    [visibleMessages.length, toolResults, providerId]
+    [visibleMessages.length, toolResults, providerId, interactiveEnabled]
   );
 
   return (

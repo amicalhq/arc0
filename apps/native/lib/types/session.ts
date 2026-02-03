@@ -22,6 +22,8 @@ export interface Session {
   gitBranch: string | null;
   startedAt: string;
   endedAt: string | null;
+  /** True when the session can accept interactive input (e.g. running in tmux). */
+  interactive?: boolean;
   messageCount: number;
   lastMessageAt: string | null;
   status: SessionStatus;
