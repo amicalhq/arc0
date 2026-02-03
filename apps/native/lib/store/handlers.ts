@@ -6,7 +6,7 @@
 import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
 import type { Row, Store } from 'tinybase';
-import type { RawMessageEnvelope, RawMessagesBatchPayload } from '@arc0/types';
+import type { ModelId, RawMessageEnvelope, RawMessagesBatchPayload } from '@arc0/types';
 import type { SessionData, SessionsSyncPayload } from '../socket/types';
 import type { ContentBlock } from '../types/session';
 import {
@@ -119,6 +119,75 @@ export async function generateProjectId(workstationId: string, path: string): Pr
  */
 function toRow(obj: ProcessedWorkstation | ProcessedProject | Record<string, unknown>): Row {
   return obj as unknown as Row;
+}
+
+// =============================================================================
+// Model Parsing (Claude)
+// =============================================================================
+
+function parseModelIdFromClaudeModelOutput(stdout: string): ModelId | null {
+  const text = stdout.toLowerCase();
+
+  // We only treat explicit "set/kept model" outputs as authoritative.
+  if (!text.includes('set model to') && !text.includes('kept model as')) {
+    return null;
+  }
+
+  if (text.includes('default')) return 'default';
+  if (text.includes('opus')) return 'opus-4.5';
+  if (text.includes('sonnet')) return 'sonnet-4.5';
+  if (text.includes('haiku')) return 'haiku-4.5';
+
+  return null;
+}
+
+function updateSessionModelsFromRawBatch(
+  store: Store,
+  processedMessages: ProcessedMessage[],
+  outputMessages: ProcessedMessage[]
+): void {
+  const updates = new Map<string, ModelId>();
+
+  // 1) Prefer parsing from local command messages so we can scope to `/model` only.
+  for (const msg of processedMessages) {
+    if (msg.type !== 'system' || msg.subtype !== 'local_command') continue;
+    if (msg.command_name !== '/model') continue;
+    if (!msg.stdout) continue;
+    const model = parseModelIdFromClaudeModelOutput(msg.stdout);
+    if (!model) continue;
+    updates.set(msg.session_id, model);
+  }
+
+  // 2) Also handle late-arriving output-only rows by checking their parent command in TinyBase.
+  // This prevents accidental matches from other commands (e.g. `/help` text mentioning "set model to").
+  for (const output of outputMessages) {
+    if (!output.stdout) continue;
+    if (!output.parent_id) continue;
+
+    const parent = store.getRow('messages', output.parent_id) as
+      | Record<string, unknown>
+      | undefined;
+    if (!parent || Object.keys(parent).length === 0) {
+      // Parent command isn't in TinyBase (native stores only active session messages).
+      // We derive the model when that session's messages are loaded from SQLite.
+      continue;
+    }
+    if (parent.subtype !== 'local_command') continue;
+    if (parent.command_name !== '/model') continue;
+
+    const stdout = (parent.stdout as string | undefined) ?? output.stdout;
+    const model = parseModelIdFromClaudeModelOutput(stdout);
+    if (!model) continue;
+    updates.set(output.session_id, model);
+  }
+
+  if (updates.size === 0) return;
+
+  store.transaction(() => {
+    for (const [sessionId, model] of updates) {
+      store.setPartialRow('sessions', sessionId, { model });
+    }
+  });
 }
 
 // =============================================================================
@@ -240,15 +309,21 @@ function upsertSession(
   if (existing && Object.keys(existing).length > 0) {
     // Update existing - preserves name, first_message, message_count, etc.
     // Note: name intentionally excluded - only set via custom-title messages
-    store.setPartialRow('sessions', session.id, {
+    const partial: Record<string, string | number> = {
       project_id: projectId ?? '',
-      model: session.model ?? '',
       git_branch: session.gitBranch ?? '',
       started_at: session.startedAt,
       open: 1,
       interactive,
       workstation_id: workstationId,
-    });
+    };
+
+    // Preserve existing model if base doesn't provide one (currently TODO in base)
+    if (session.model) {
+      partial.model = session.model;
+    }
+
+    store.setPartialRow('sessions', session.id, partial);
   } else {
     // New session - create with defaults
     // Note: 'id' is NOT included as cell data - it's the row ID (rowIdColumnName: 'id')
@@ -487,6 +562,9 @@ async function handleMessagesBatchInternal(
   // 4. Update session metadata
   const metadataUpdates = calculateSessionMetadataFromRaw(rawEnvelopes, existingCounts);
   updateSessionMetadata(store, metadataUpdates);
+
+  // 4b. Update session model from Claude /model command output (stdout)
+  updateSessionModelsFromRawBatch(store, processedMessages, outputMessages);
 
   // 5. Apply session name updates from custom-title messages
   const nameUpdates = extractSessionNameUpdates(rawEnvelopes);

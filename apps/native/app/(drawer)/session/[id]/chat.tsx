@@ -139,6 +139,10 @@ function isUserOrAssistantMessage(msg: RenderableMessage): msg is Message {
   return msg.type === 'user' || msg.type === 'assistant';
 }
 
+function isModelId(val: unknown): val is ModelId {
+  return val === 'default' || val === 'opus-4.5' || val === 'sonnet-4.5' || val === 'haiku-4.5';
+}
+
 function ChatContent({ sessionId }: { sessionId: string }) {
   const { isReady } = useStoreContext();
   const { messages, isLoadingMessages } = useMessages(sessionId);
@@ -146,7 +150,7 @@ function ChatContent({ sessionId }: { sessionId: string }) {
   const isSessionInteractive = session?.interactive !== false;
   const [inputText, setInputText] = useState('');
   const [mode, setMode] = useState<PromptMode>('default');
-  const [model, setModel] = useState<ModelId>('default');
+  const [selectedModel, setSelectedModel] = useState<ModelId>('default');
 
   // Loading state: store not ready OR actively loading closed session messages
   const isLoading = !isReady || isLoadingMessages;
@@ -171,6 +175,69 @@ function ChatContent({ sessionId }: { sessionId: string }) {
     () => messages.filter(isUserOrAssistantMessage),
     [messages]
   );
+
+  // Keep composer model in sync with session model (derived from transcript).
+  // Only sync when `session.model` changes to avoid snapping back to a stale value
+  // after an optimistic sendPrompt ack returns but before transcript stdout lands.
+  useEffect(() => {
+    const sessionModel = session?.model;
+    setSelectedModel(isModelId(sessionModel) ? sessionModel : 'default');
+  }, [sessionId, session?.model]);
+
+  // Handle model selection change (sends /model to tmux via sendPrompt).
+  // NOTE: Ack is optimistic (keys sent to tmux); actual model is confirmed via transcript stdout.
+  const handleModelChange = async (nextModel: ModelId) => {
+    if (!isSessionInteractive) return;
+    if (isSubmitting || contextIsSubmitting) return;
+
+    if (session?.providerId !== 'claude') {
+      const message = 'Model switching is only supported for Claude sessions.';
+      if (Platform.OS === 'web') {
+        window.alert(message);
+      } else {
+        Alert.alert('Error', message);
+      }
+      return;
+    }
+
+    const commandByModel: Record<ModelId, string> = {
+      default: '/model default',
+      'opus-4.5': '/model Opus',
+      'sonnet-4.5': '/model Sonnet',
+      'haiku-4.5': '/model Haiku',
+    };
+
+    const command = commandByModel[nextModel];
+
+    const previousModel = selectedModel;
+    setSelectedModel(nextModel);
+
+    try {
+      const result = await sendPrompt({
+        sessionId,
+        text: command,
+        model: nextModel,
+        mode: 'default',
+      });
+      if (result.status === 'error') {
+        setSelectedModel(previousModel);
+        const message = result.message ?? 'Failed to change model';
+        if (Platform.OS === 'web') {
+          window.alert(message);
+        } else {
+          Alert.alert('Error', message);
+        }
+      }
+    } catch (err) {
+      setSelectedModel(previousModel);
+      const message = err instanceof Error ? err.message : 'Failed to change model';
+      if (Platform.OS === 'web') {
+        window.alert(message);
+      } else {
+        Alert.alert('Error', message);
+      }
+    }
+  };
 
   // Detect pending interactive tool from messages and explicit permission requests
   const pendingTool = useMemo(() => {
@@ -465,7 +532,7 @@ function ChatContent({ sessionId }: { sessionId: string }) {
       const payload = {
         sessionId,
         text: inputText.trim(),
-        model,
+        model: selectedModel,
         mode,
         lastMessageId: lastMsg?.id,
         lastMessageTs: lastMsg?.ts,
@@ -589,12 +656,12 @@ function ChatContent({ sessionId }: { sessionId: string }) {
         }
         onSubmit={handleSubmit}
         canSubmit={canSubmit}
-        isSubmitting={contextIsSubmitting}
+        isSubmitting={contextIsSubmitting || isSubmitting}
         editable={isSessionInteractive && !isSubmitting && !contextIsSubmitting}
         mode={mode}
         onModeChange={setMode}
-        model={model}
-        onModelChange={setModel}
+        model={selectedModel}
+        onModelChange={handleModelChange}
         showSelectors
         agentRunning={agentRunning}
         onStop={handleStop}

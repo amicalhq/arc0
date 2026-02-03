@@ -4,6 +4,7 @@
  */
 
 import { Platform } from 'react-native';
+import type { ModelId } from '@arc0/types';
 import type { Indexes, Store } from 'tinybase';
 import { executeQuery } from './persister';
 
@@ -58,6 +59,22 @@ function parseCommandOutput(content: string): { stdout?: string; stderr?: string
 function stripAnsi(text: string): string {
   // eslint-disable-next-line no-control-regex
   return text.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
+}
+
+function parseModelIdFromClaudeModelOutput(stdout: string): ModelId | null {
+  const text = stdout.toLowerCase();
+
+  // Only treat explicit "set/kept model" outputs as authoritative.
+  if (!text.includes('set model to') && !text.includes('kept model as')) {
+    return null;
+  }
+
+  if (text.includes('default')) return 'default';
+  if (text.includes('opus')) return 'opus-4.5';
+  if (text.includes('sonnet')) return 'sonnet-4.5';
+  if (text.includes('haiku')) return 'haiku-4.5';
+
+  return null;
 }
 
 /**
@@ -238,9 +255,29 @@ export async function loadSessionMessages(
 
   // Insert into TinyBase store for UI reactivity
   // Note: 'id' is NOT included as cell data - it's the row ID (rowIdColumnName: 'id')
+  const derivedModel = (() => {
+    // Walk backwards to find the most recent `/model` command output.
+    for (let i = processedMessages.length - 1; i >= 0; i--) {
+      const row = processedMessages[i]?.row;
+      if (!row) continue;
+      if (row.subtype !== 'local_command') continue;
+      if (row.command_name !== '/model') continue;
+
+      const stdout = row.stdout;
+      if (typeof stdout !== 'string' || stdout.length === 0) continue;
+
+      const model = parseModelIdFromClaudeModelOutput(stdout);
+      if (model) return model;
+    }
+    return null;
+  })();
+
   store.transaction(() => {
     for (const { id, row } of processedMessages) {
       store.setRow('messages', id, row);
+    }
+    if (derivedModel) {
+      store.setPartialRow('sessions', sessionId, { model: derivedModel });
     }
   });
 
