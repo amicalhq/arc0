@@ -9,16 +9,16 @@ import type { SessionStatus } from '@/lib/types/session-status';
  * Status colors for dots and text.
  * All working states use blue, ask_user uses amber, idle/ended use muted.
  */
-export const STATUS_COLORS: Record<SessionStatus, { dot: string; text: string }> = {
-  sending: { dot: 'bg-blue-500', text: 'text-blue-500' },
-  submitting: { dot: 'bg-blue-500', text: 'text-blue-500' },
-  thinking: { dot: 'bg-blue-500', text: 'text-blue-500' },
-  working: { dot: 'bg-blue-500', text: 'text-blue-500' },
-  tool_approval: { dot: 'bg-amber-500', text: 'text-amber-500' },
-  plan_approval: { dot: 'bg-amber-500', text: 'text-amber-500' },
-  ask_user: { dot: 'bg-amber-500', text: 'text-amber-500' },
-  idle: { dot: 'bg-muted-foreground', text: 'text-muted-foreground' },
-  ended: { dot: 'bg-muted-foreground', text: 'text-muted-foreground' },
+export const STATUS_COLORS: Record<SessionStatus, { dot: string; text: string; hex: string }> = {
+  sending: { dot: 'bg-blue-500', text: 'text-blue-500', hex: '#3b82f6' },
+  submitting: { dot: 'bg-blue-500', text: 'text-blue-500', hex: '#3b82f6' },
+  thinking: { dot: 'bg-blue-500', text: 'text-blue-500', hex: '#3b82f6' },
+  working: { dot: 'bg-blue-500', text: 'text-blue-500', hex: '#3b82f6' },
+  tool_approval: { dot: 'bg-amber-500', text: 'text-amber-500', hex: '#f59e0b' },
+  plan_approval: { dot: 'bg-amber-500', text: 'text-amber-500', hex: '#f59e0b' },
+  ask_user: { dot: 'bg-amber-500', text: 'text-amber-500', hex: '#f59e0b' },
+  idle: { dot: 'bg-muted-foreground', text: 'text-muted-foreground', hex: '#71717a' },
+  ended: { dot: 'bg-muted-foreground', text: 'text-muted-foreground', hex: '#71717a' },
 };
 
 /**

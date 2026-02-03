@@ -1,10 +1,10 @@
 import { View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Loader, FolderIcon, GitBranchIcon } from 'lucide-react-native';
+import { FolderIcon, GitBranchIcon } from 'lucide-react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import { Shimmer } from '@/components/ui/shimmer';
+import { Spinner } from '@/components/ui/spinner';
 import type { Session } from '@/lib/types/session';
 import { useEffectiveSessionStatus } from '@/lib/store/hooks';
 import { formatRelativeTimeShort } from '@/lib/utils/time';
@@ -54,11 +54,9 @@ export function SessionCard({ session, isSelected = false, onPress }: SessionCar
       <View className="flex-row items-start gap-2">
         {/* Status indicator */}
         {isAnimated ? (
-          <Shimmer isShimmering>
-            <View className="w-5 items-center justify-center pt-0.5">
-              <Icon as={Loader} className={`size-4 ${colors.text}`} />
-            </View>
-          </Shimmer>
+          <View className="w-5 items-center justify-center pt-0.5">
+            <Spinner size="small" color={colors.hex} />
+          </View>
         ) : (
           <View className="w-5 items-center justify-center pt-1.5">
             <View className={`size-2.5 rounded-full ${colors.dot}`} />
