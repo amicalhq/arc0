@@ -14,6 +14,7 @@ import { Icon } from '@/components/ui/icon';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { THEME } from '@/lib/theme';
 import { CreateSessionModal, SessionList } from '@/components/sessions';
+import { ProjectList } from '@/components/projects';
 import { WelcomeEmpty } from '@/components/WelcomeEmpty';
 import { useClosedSessions, useOpenSessions, useWorkstations } from '@/lib/store/hooks';
 import { useConnectionStatus, useBackgroundConnectedCount, useHasAttemptedInitialConnect } from '@/lib/socket/provider';
@@ -143,9 +144,10 @@ function DrawerContent(
             onSessionPress={handleSessionPress}
           />
         ) : (
-          <View className="flex-1 items-center justify-center p-4">
-            <Text className="text-muted-foreground text-center">Projects view coming soon</Text>
-          </View>
+          <ProjectList
+            selectedSessionId={selectedSessionId}
+            onSessionPress={handleSessionPress}
+          />
         )}
       </View>
 

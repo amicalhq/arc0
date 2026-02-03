@@ -1,6 +1,6 @@
 import { View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Loader, FolderIcon, GitBranchIcon } from 'lucide-react-native';
+import { Loader, GitBranchIcon } from 'lucide-react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
@@ -8,17 +8,20 @@ import { Shimmer } from '@/components/ui/shimmer';
 import type { Session } from '@/lib/types/session';
 import { useEffectiveSessionStatus } from '@/lib/store/hooks';
 import { formatRelativeTimeShort } from '@/lib/utils/time';
-import { truncatePath } from '@/lib/utils/path';
 import { formatFirstMessageForDisplay } from '@/lib/utils/session-display';
 import { STATUS_COLORS, isAnimatedStatus } from '@/lib/utils/status-indicator';
 
-interface SessionCardProps {
+interface ProjectSessionItemProps {
   session: Session;
   isSelected?: boolean;
   onPress?: () => void;
 }
 
-export function SessionCard({ session, isSelected = false, onPress }: SessionCardProps) {
+/**
+ * Session item within a project list.
+ * Similar to SessionCard but indented and without project path (since it's under the project).
+ */
+export function ProjectSessionItem({ session, isSelected = false, onPress }: ProjectSessionItemProps) {
   const router = useRouter();
   const statusInfo = useEffectiveSessionStatus(session);
   const colors = STATUS_COLORS[statusInfo.status];
@@ -32,7 +35,7 @@ export function SessionCard({ session, isSelected = false, onPress }: SessionCar
     });
   };
 
-  // Display name: use firstMessage if available, fallback to project folder name
+  // Display name: use firstMessage if available, fallback to session name
   const displayName = session.firstMessage
     ? formatFirstMessageForDisplay(session.firstMessage)
     : session.name || 'New Session';
@@ -41,16 +44,13 @@ export function SessionCard({ session, isSelected = false, onPress }: SessionCar
   const showTime = statusInfo.status === 'idle' || statusInfo.status === 'ended';
   const timeAgo = formatRelativeTimeShort(session.lastMessageAt || session.startedAt);
 
-  // Truncated project path
-  const projectPath = truncatePath(session.projectName, 35);
-
   return (
     <Pressable
-      testID={`session-card-${session.id}`}
+      testID={`project-session-item-${session.id}`}
       accessibilityRole="button"
       accessibilityLabel={`Session: ${displayName}. Status: ${statusInfo.label}`}
       onPress={handlePress}
-      className={`mx-2 mb-2 rounded-sm border border-border px-2.5 py-2 active:opacity-80 ${isSelected ? 'bg-card' : 'bg-background'}`}>
+      className={`ml-6 mr-2 mb-2 rounded-sm border border-border px-2.5 py-2 active:opacity-80 ${isSelected ? 'bg-card' : 'bg-background'}`}>
       <View className="flex-row items-start gap-2">
         {/* Status indicator */}
         {isAnimated ? (
@@ -86,14 +86,6 @@ export function SessionCard({ session, isSelected = false, onPress }: SessionCar
                 </Text>
               </View>
             )}
-          </View>
-
-          {/* Project path */}
-          <View className="mt-0.5 flex-row items-center gap-1">
-            <Icon as={FolderIcon} className="text-muted-foreground size-3" />
-            <Text className="text-muted-foreground text-xs font-mono" numberOfLines={1}>
-              {projectPath}
-            </Text>
           </View>
         </View>
       </View>

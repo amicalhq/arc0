@@ -45,13 +45,15 @@ const PROVIDER_OPTIONS: ProviderOption[] = [
 interface CreateSessionModalProps {
   visible: boolean;
   onClose: () => void;
+  /** Optional project ID to pre-select when opening the modal */
+  defaultProjectId?: string;
 }
 
 /**
  * Modal for creating a new session.
  * Uses the openSession action to create sessions via Socket.IO.
  */
-export function CreateSessionModal({ visible, onClose }: CreateSessionModalProps) {
+export function CreateSessionModal({ visible, onClose, defaultProjectId }: CreateSessionModalProps) {
   const { theme } = useUniwind();
   const colors = THEME[theme ?? 'light'];
   const insets = useSafeAreaInsets();
@@ -70,11 +72,19 @@ export function CreateSessionModal({ visible, onClose }: CreateSessionModalProps
   const activeSessionRow = useRow('sessions', activeSessionId ?? '') as { project_id?: string } | undefined;
   const activeProjectId = activeSessionRow?.project_id;
 
-  // Compute default project: active session's project if exists, otherwise first project
+  // Compute default project: prop > active session's project > first project
   const defaultProject = useMemo(() => {
     if (projects.length === 0) return undefined;
 
-    // Try to find active session's project
+    // Priority 1: Use prop if provided
+    if (defaultProjectId) {
+      const propProject = projects.find((p) => p.id === defaultProjectId);
+      if (propProject) {
+        return { value: propProject.id, label: truncatePath(propProject.path, 40) };
+      }
+    }
+
+    // Priority 2: Use active session's project
     if (activeProjectId) {
       const activeProject = projects.find((p) => p.id === activeProjectId);
       if (activeProject) {
@@ -84,14 +94,14 @@ export function CreateSessionModal({ visible, onClose }: CreateSessionModalProps
 
     // Fallback to first project
     return { value: projects[0].id, label: truncatePath(projects[0].path, 40) };
-  }, [projects, activeProjectId]);
+  }, [projects, defaultProjectId, activeProjectId]);
 
   // Set default project when modal opens or default changes
   useEffect(() => {
-    if (visible && defaultProject && !selectedProject) {
+    if (visible && defaultProject) {
       setSelectedProject(defaultProject);
     }
-  }, [visible, defaultProject, selectedProject]);
+  }, [visible, defaultProject]);
 
   const resetForm = () => {
     setProvider('claude-code');
