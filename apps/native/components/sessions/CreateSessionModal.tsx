@@ -27,19 +27,15 @@ import { useWorkstationProjects } from '@/lib/store/hooks';
 import { THEME } from '@/lib/theme';
 import { truncatePath } from '@/lib/utils/path';
 
-// Local provider ID type (matches ProviderIcon)
-type LocalProviderId = 'claude-code' | 'codex' | 'gemini-cli';
-
 interface ProviderOption {
-  value: LocalProviderId;
+  value: TypesProviderId;
   label: string;
-  apiValue: TypesProviderId;
 }
 
 const PROVIDER_OPTIONS: ProviderOption[] = [
-  { value: 'claude-code', label: 'Claude', apiValue: 'claude' },
-  { value: 'codex', label: 'Codex', apiValue: 'codex' },
-  { value: 'gemini-cli', label: 'Gemini', apiValue: 'gemini' },
+  { value: 'claude', label: 'Claude' },
+  { value: 'codex', label: 'Codex' },
+  { value: 'gemini', label: 'Gemini' },
 ];
 
 interface CreateSessionModalProps {
@@ -61,7 +57,7 @@ export function CreateSessionModal({
   const { theme } = useUniwind();
   const colors = THEME[theme ?? 'light'];
   const insets = useSafeAreaInsets();
-  const [provider, setProvider] = useState<LocalProviderId>('claude-code');
+  const [provider, setProvider] = useState<TypesProviderId>('claude');
   const [sessionName, setSessionName] = useState('');
   const [selectedProject, setSelectedProject] = useState<
     { value: string; label: string } | undefined
@@ -112,7 +108,7 @@ export function CreateSessionModal({
   }, [visible, defaultProject]);
 
   const resetForm = () => {
-    setProvider('claude-code');
+    setProvider('claude');
     setSessionName('');
     setSelectedProject(defaultProject);
     setError(null);
@@ -120,10 +116,6 @@ export function CreateSessionModal({
 
   const handleSubmit = async () => {
     setError(null);
-
-    // Get the API provider value
-    const providerOption = PROVIDER_OPTIONS.find((p) => p.value === provider);
-    if (!providerOption) return;
 
     // Look up the selected project to get its path (required)
     const selectedProjectData = selectedProject
@@ -136,7 +128,7 @@ export function CreateSessionModal({
     }
 
     const payload = {
-      provider: providerOption.apiValue,
+      provider,
       name: sessionName.trim() || undefined,
       cwd: selectedProjectData.path, // Required: working directory for the session
     };
@@ -204,7 +196,7 @@ export function CreateSessionModal({
               </Text>
               <RadioGroup
                 value={provider}
-                onValueChange={(val) => val && setProvider(val as LocalProviderId)}>
+                onValueChange={(val) => val && setProvider(val as TypesProviderId)}>
                 {PROVIDER_OPTIONS.map((option) => (
                   <Pressable
                     key={option.value}
