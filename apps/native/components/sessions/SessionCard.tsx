@@ -77,7 +77,7 @@ export function SessionCard({ session, isSelected = false, onPress }: SessionCar
             </Text>
 
             {session.gitBranch && (
-              <View className="bg-muted flex-row items-center gap-1 rounded-sm px-1.5 py-0.5">
+              <View className="bg-muted flex-row items-center gap-0.5 rounded-sm px-1 py-px">
                 <Icon as={GitBranchIcon} className="text-muted-foreground size-3" />
                 <Text className="text-muted-foreground font-mono text-xs" numberOfLines={1}>
                   {session.gitBranch}
