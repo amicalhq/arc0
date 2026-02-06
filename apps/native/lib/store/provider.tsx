@@ -310,6 +310,12 @@ export function StoreProvider({ children }: StoreProviderProps) {
         await new Promise((resolve) => setTimeout(resolve, 0));
         if (isStale()) return;
 
+        // Expose store globally for testing and debugging
+        if (__DEV__) {
+          (window as any).__ARC0_STORE__ = store;
+          console.log('[StoreProvider] Store exposed as window.__ARC0_STORE__');
+        }
+
         setIsReady(true);
       } catch (err) {
         console.error('[StoreProvider] Initialization failed:', err);

@@ -260,6 +260,38 @@ export class SocketManager {
   };
 
   // ==========================================================================
+  // Dev/Testing Methods
+  // ==========================================================================
+
+  /**
+   * Set a mock connection state for a workstation (dev only).
+   * Useful for testing and debugging without actual socket connections.
+   */
+  setMockConnectionState(workstationId: string, state: ConnectionState): void {
+    if (!__DEV__) return;
+
+    // Mock socket with no-op methods to prevent crashes during cleanup
+    const mockSocket = {
+      removeAllListeners: () => mockSocket,
+      close: () => {},
+      disconnect: () => mockSocket,
+      connected: state.status === 'connected',
+      on: () => mockSocket,
+      off: () => mockSocket,
+      emit: () => mockSocket,
+    } as unknown as AppSocket;
+
+    const fakeConnection: WorkstationConnection = {
+      socket: mockSocket,
+      state,
+      url: 'mock://localhost',
+    };
+    this.connections.set(workstationId, fakeConnection);
+    this.notifyListeners();
+    console.log(`[SocketManager] Set mock connection state for ${workstationId}:`, state.status);
+  }
+
+  // ==========================================================================
   // Private Methods
   // ==========================================================================
 

@@ -136,6 +136,14 @@ export function SocketProvider({ children, autoConnect = true }: SocketProviderP
   const manager = useMemo(() => getSocketManager(), []);
   const isActiveRef = useRef(true);
 
+  // Expose SocketManager globally for testing and debugging
+  useEffect(() => {
+    if (__DEV__) {
+      (window as any).__ARC0_SOCKET_MANAGER__ = manager;
+      console.log('[SocketProvider] SocketManager exposed as window.__ARC0_SOCKET_MANAGER__');
+    }
+  }, [manager]);
+
   // Ensure sockets are closed on unmount / dev reload to avoid duplicate connections.
   useEffect(() => {
     // Reset activity flag on each mount/effect run so dev reloads can reconnect.
