@@ -14,6 +14,8 @@ import {
   MessageCircleIcon,
   GithubIcon,
   RotateCcwIcon,
+  ShieldIcon,
+  FileTextIcon,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUniwind } from 'uniwind';
@@ -291,10 +293,32 @@ export default function SettingsScreen() {
           <Pressable
             testID="help-github"
             onPress={() => Linking.openURL('https://github.com/arc0ai/arc0')}
-            className="active:bg-accent flex-row items-center justify-between px-4 py-3">
+            className="active:bg-accent flex-row items-center justify-between px-4 py-3"
+            style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
             <View className="flex-row items-center gap-3">
               <Icon as={GithubIcon} className="text-foreground size-5" />
               <Text className="text-foreground">GitHub</Text>
+            </View>
+            <Icon as={ChevronRightIcon} className="text-muted-foreground size-5" />
+          </Pressable>
+          <Pressable
+            testID="help-privacy"
+            onPress={() => Linking.openURL('https://arc0.ai/privacy')}
+            className="active:bg-accent flex-row items-center justify-between px-4 py-3"
+            style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
+            <View className="flex-row items-center gap-3">
+              <Icon as={ShieldIcon} className="text-foreground size-5" />
+              <Text className="text-foreground">Privacy Policy</Text>
+            </View>
+            <Icon as={ChevronRightIcon} className="text-muted-foreground size-5" />
+          </Pressable>
+          <Pressable
+            testID="help-terms"
+            onPress={() => Linking.openURL('https://arc0.ai/terms')}
+            className="active:bg-accent flex-row items-center justify-between px-4 py-3">
+            <View className="flex-row items-center gap-3">
+              <Icon as={FileTextIcon} className="text-foreground size-5" />
+              <Text className="text-foreground">Terms of Service</Text>
             </View>
             <Icon as={ChevronRightIcon} className="text-muted-foreground size-5" />
           </Pressable>
