@@ -57,7 +57,7 @@
           "imageWidth": 196
         }
       ],
-      "expo-secure-store"
+      ["expo-secure-store", { "faceIDPermission": false }]
     ],
     "experiments": {
       "typedRoutes": true,
