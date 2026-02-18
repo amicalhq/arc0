@@ -61,7 +61,6 @@
     "@rn-primitives/toggle-group": "^1.2.0",
     "@rn-primitives/tooltip": "^1.2.0",
     "@shopify/flash-list": "^2.2.0",
-
     "async-mutex": "^0.5.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -120,6 +119,7 @@
     "@wdio/spec-reporter": "^9.5.0",
     "appium": "^3.1.2",
     "appium-uiautomator2-driver": "^6.7.10",
+    "babel-preset-expo": "^54.0.10",
     "eslint": "catalog:",
     "eslint-config-expo": "~10.0.0",
     "expect-webdriverio": "^5.4.3",

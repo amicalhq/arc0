@@ -19,8 +19,16 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ai.arc0.app",
-      "associatedDomains": ["applinks:arc0.ai", "applinks:www.arc0.ai"],
-      "appleTeamId": "59CRJ9SJ4N"
+      "associatedDomains": [
+        "applinks:arc0.ai",
+        "applinks:www.arc0.ai",
+        "applinks:arc0.ai",
+        "applinks:www.arc0.ai"
+      ],
+      "appleTeamId": "59CRJ9SJ4N",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "edgeToEdgeEnabled": true,
@@ -35,10 +43,21 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
-            { "scheme": "https", "host": "arc0.ai", "pathPrefix": "/connect" },
-            { "scheme": "https", "host": "www.arc0.ai", "pathPrefix": "/connect" }
+            {
+              "scheme": "https",
+              "host": "arc0.ai",
+              "pathPrefix": "/connect"
+            },
+            {
+              "scheme": "https",
+              "host": "www.arc0.ai",
+              "pathPrefix": "/connect"
+            }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -57,11 +76,23 @@
           "imageWidth": 196
         }
       ],
-      ["expo-secure-store", { "faceIDPermission": false }]
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9c32712f-ac19-420e-93b5-bcf0af448dfb"
+      }
+    },
+    "owner": "amical"
   }
 }
