@@ -110,7 +110,7 @@ export function SessionList({
   if (activeSessions.length === 0 && historicalSessions.length === 0) {
     return (
       <View testID="session-list-empty" className="flex-1 items-center justify-center p-4">
-        <Text className="text-muted-foreground text-center">No sessions yet</Text>
+        <Text className="text-muted-foreground text-center">No open sessions</Text>
       </View>
     );
   }

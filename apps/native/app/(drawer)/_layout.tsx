@@ -16,6 +16,7 @@ import { THEME } from '@/lib/theme';
 import { CreateSessionModal, SessionList } from '@/components/sessions';
 import { ProjectList } from '@/components/projects';
 import { WelcomeEmpty } from '@/components/WelcomeEmpty';
+import { ConnectionStatusView } from '@/components/ConnectionStatusView';
 import { useClosedSessions, useOpenSessions, useWorkstations } from '@/lib/store/hooks';
 import {
   useConnectionStatus,
@@ -25,6 +26,7 @@ import {
 import { useStoreContext } from '@/lib/store/provider';
 import type { ConnectionStatus } from '@/lib/socket/types';
 import { useResponsiveDrawer } from '@/lib/hooks/useResponsiveDrawer';
+import { ConnectionStatusModal } from '@/components/workstations';
 
 // Map socket connection status to UI display status
 type SyncStatus = 'disconnected' | 'connecting' | 'connected';
@@ -47,8 +49,11 @@ function DrawerContent(
   const syncStatus = useSyncStatus();
   const [activeTab, setActiveTab] = useState<'sessions' | 'projects'>('sessions');
   const [showCreateSession, setShowCreateSession] = useState(false);
+  const [showConnectionStatus, setShowConnectionStatus] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const { selectedSessionId } = props;
+  const isOnIndex = pathname === '/' || pathname === '';
   const { isReady: storeReady } = useStoreContext();
   const hasAttemptedInitialConnect = useHasAttemptedInitialConnect();
   const isInitializing = !storeReady || !hasAttemptedInitialConnect;
@@ -64,6 +69,15 @@ function DrawerContent(
 
   const handleSessionPress = () => {
     if (!isPersistent) {
+      props.navigation.closeDrawer();
+    }
+  };
+
+  const handleCloseDrawer = () => {
+    // On index route with a selected session, navigate to it instead of showing empty screen
+    if (isOnIndex && selectedSessionId) {
+      router.replace({ pathname: '/session/[id]/chat', params: { id: selectedSessionId } });
+    } else {
       props.navigation.closeDrawer();
     }
   };
@@ -96,7 +110,10 @@ function DrawerContent(
             />
           </View>
           <View className="flex-row items-center gap-1">
-            <View testID="connection-indicator" className="flex-row items-center">
+            <Pressable
+              testID="connection-indicator"
+              className="flex-row items-center active:opacity-70"
+              onPress={() => setShowConnectionStatus(true)}>
               <View className="p-2">
                 <FontAwesome6
                   name={syncStatus === 'connected' ? 'plug-circle-check' : 'plug-circle-xmark'}
@@ -114,10 +131,10 @@ function DrawerContent(
               {backgroundConnectedCount > 0 && (
                 <Text className="text-muted-foreground text-xs">(+{backgroundConnectedCount})</Text>
               )}
-            </View>
-            {!isPersistent && (
+            </Pressable>
+            {!isPersistent && (!isOnIndex || selectedSessionId) && (
               <Pressable
-                onPress={() => props.navigation.closeDrawer()}
+                onPress={handleCloseDrawer}
                 className="active:bg-accent rounded-lg p-2">
                 <Icon as={XIcon} className="text-muted-foreground size-5" />
               </Pressable>
@@ -140,6 +157,15 @@ function DrawerContent(
         ) : hasNoWorkstations && !isPersistent ? (
           // Show setup instructions in drawer only on small screens (non-persistent drawer)
           <WelcomeEmpty compact />
+        ) : hasNoWorkstations && isPersistent ? (
+          <View className="flex-1 items-center justify-center p-4">
+            <Text className="text-muted-foreground text-center">
+              Sessions will appear here when a workstation is connected.
+            </Text>
+          </View>
+        ) : !isPersistent && activeSessions.length === 0 && historicalSessions.length === 0 ? (
+          // On non-persistent (mobile), show detailed status when no sessions (drawer IS the screen)
+          <ConnectionStatusView />
         ) : activeTab === 'sessions' ? (
           <SessionList
             activeSessions={activeSessions}
@@ -174,9 +200,9 @@ function DrawerContent(
           <Pressable
             testID="create-session-button"
             onPress={() => setShowCreateSession(true)}
-            disabled={hasNoWorkstations}
+            disabled={hasNoWorkstations || syncStatus !== 'connected'}
             className="active:bg-accent rounded-lg p-2"
-            style={{ opacity: hasNoWorkstations ? 0.3 : 1 }}>
+            style={{ opacity: hasNoWorkstations || syncStatus !== 'connected' ? 0.3 : 1 }}>
             <Icon as={PlusIcon} className="text-muted-foreground size-5" />
           </Pressable>
           <Pressable
@@ -189,6 +215,11 @@ function DrawerContent(
       </View>
 
       <CreateSessionModal visible={showCreateSession} onClose={() => setShowCreateSession(false)} />
+      <ConnectionStatusModal
+        visible={showConnectionStatus}
+        onClose={() => setShowConnectionStatus(false)}
+        syncStatus={syncStatus}
+      />
     </View>
   );
 }
@@ -197,7 +228,10 @@ const MemoizedDrawerContent = React.memo(DrawerContent);
 
 const DrawerContentWrapper = (props: DrawerContentComponentProps & { isPersistent?: boolean }) => {
   const { id: selectedSessionId } = useGlobalSearchParams<{ id?: string }>();
-  return <MemoizedDrawerContent {...props} selectedSessionId={selectedSessionId} />;
+  const activeSessions = useOpenSessions();
+  // Default to first active session for visual highlighting when no session is selected (e.g. initial load on mobile)
+  const effectiveSelectedId = selectedSessionId ?? activeSessions[0]?.id;
+  return <MemoizedDrawerContent {...props} selectedSessionId={effectiveSelectedId} />;
 };
 
 export default function DrawerLayout() {
@@ -229,6 +263,7 @@ export default function DrawerLayout() {
         options={{
           title: 'Arc0',
           headerShown: false,
+          swipeEnabled: false, // Drawer IS the screen on index; prevent swipe-close to empty content
           drawerLabel: 'Home',
           drawerIcon: ({ color, size }) => (
             <MessageSquareIcon color={color} width={size} height={size} />
