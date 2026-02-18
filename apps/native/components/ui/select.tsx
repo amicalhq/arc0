@@ -48,6 +48,15 @@ function SelectTrigger({
     children?: React.ReactNode;
     size?: 'default' | 'sm';
   }) {
+  // On mobile web, RN Web's Pressable intercepts touch/click events in a way
+  // that prevents Radix Select's onClick handler from firing. Radix relies on
+  // onClick (not onPointerDown) to open the dropdown on touch devices.
+  // We use onPress (which always fires from Pressable) to manually open the select.
+  const { onOpenChange } = SelectPrimitive.useRootContext();
+  const handlePress = Platform.OS === 'web'
+    ? () => onOpenChange(true)
+    : props.onPress;
+
   return (
     <SelectPrimitive.Trigger
       ref={ref}
@@ -60,7 +69,8 @@ function SelectTrigger({
         size === 'sm' && 'h-8 py-2 sm:py-1.5',
         className
       )}
-      {...props}>
+      {...props}
+      onPress={handlePress}>
       <>{children}</>
       <Icon as={ChevronDown} aria-hidden={true} className="text-muted-foreground size-4" />
     </SelectPrimitive.Trigger>

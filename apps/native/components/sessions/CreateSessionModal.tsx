@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import { Portal } from '@rn-primitives/portal';
@@ -26,6 +26,14 @@ import { useActiveWorkstationId } from '@/lib/socket/provider';
 import { useWorkstationProjects } from '@/lib/store/hooks';
 import { THEME } from '@/lib/theme';
 import { truncatePath } from '@/lib/utils/path';
+
+// On web, use a plain View instead of KeyboardStickyView. The CSS transform
+// from KeyboardStickyView creates a new stacking context that blocks touch
+// events on the Radix Select dropdown. Browsers handle keyboard avoidance natively.
+const NativeModalContainer = (props: React.ComponentProps<typeof View>) => (
+  <KeyboardStickyView offset={{ opened: 0, closed: 0 }} {...props} />
+);
+const ModalContainer = Platform.OS === 'web' ? View : NativeModalContainer;
 
 interface ProviderOption {
   value: TypesProviderId;
@@ -167,10 +175,7 @@ export function CreateSessionModal({
         accessibilityLabel="Close modal"
       />
 
-      {/* Modal with keyboard avoiding */}
-      <KeyboardStickyView
-        offset={{ opened: 0, closed: 0 }}
-        className="absolute right-0 bottom-0 left-0">
+      <ModalContainer className="absolute right-0 bottom-0 left-0">
         <View
           className="bg-background border-border rounded-t-2xl border-t"
           style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
@@ -275,7 +280,7 @@ export function CreateSessionModal({
             </Button>
           </View>
         </View>
-      </KeyboardStickyView>
+      </ModalContainer>
     </Portal>
   );
 }

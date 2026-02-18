@@ -18,6 +18,14 @@ import { InlineSelectors } from './InlineSelectors';
 import { MobileChips } from './MobileChips';
 import { StopButton } from './StopButton';
 
+// On web, use a plain View instead of KeyboardStickyView. The CSS transform
+// from KeyboardStickyView creates a stacking context that interferes with
+// Radix Select dropdowns. Browsers handle keyboard avoidance natively.
+const NativeKeyboardView = (props: React.ComponentProps<typeof View>) => (
+  <KeyboardStickyView offset={{ opened: 0, closed: 0 }} {...props} />
+);
+const KeyboardView = Platform.OS === 'web' ? View : NativeKeyboardView;
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -91,7 +99,7 @@ export function PromptInput({
 
   return (
     <>
-      <KeyboardStickyView offset={{ opened: 0, closed: 0 }}>
+      <KeyboardView>
         <View className="border-border bg-background mx-2 mb-2 rounded-sm border">
           <TextInput
             testID="message-input"
@@ -154,7 +162,7 @@ export function PromptInput({
             )}
           </View>
         </View>
-      </KeyboardStickyView>
+      </KeyboardView>
 
       {/* Mobile options sheet */}
       {!isWeb && (

@@ -29,6 +29,39 @@ interface ToolSelectProps {
 }
 
 // =============================================================================
+// Trigger (extracted so it can use useRootContext inside Root)
+// =============================================================================
+
+function ToolSelectTrigger({
+  disabled,
+  displayLabel,
+}: {
+  disabled: boolean;
+  displayLabel: string;
+}) {
+  // On mobile web, RN Web's Pressable calls preventDefault() on touch events,
+  // preventing the 'click' that Radix Select needs to open on touch devices.
+  // We use onPress (which always fires from Pressable) to manually open.
+  const { onOpenChange } = SelectPrimitive.useRootContext();
+  const webOnPress = Platform.OS === 'web' ? () => onOpenChange(true) : undefined;
+
+  return (
+    <SelectPrimitive.Trigger disabled={disabled} asChild>
+      <Pressable
+        onPress={webOnPress}
+        className={cn(
+          'hover:bg-muted flex-row items-center gap-1 rounded-md px-2 py-1',
+          disabled && 'opacity-50'
+        )}
+        accessibilityRole="button">
+        <Text className="text-muted-foreground text-sm">{displayLabel}</Text>
+        <Icon as={ChevronDown} className="text-muted-foreground size-3" />
+      </Pressable>
+    </SelectPrimitive.Trigger>
+  );
+}
+
+// =============================================================================
 // Component
 // =============================================================================
 
@@ -52,17 +85,7 @@ export function ToolSelect({
           onValueChange(option.value);
         }
       }}>
-      <SelectPrimitive.Trigger disabled={disabled} asChild>
-        <Pressable
-          className={cn(
-            'hover:bg-muted flex-row items-center gap-1 rounded-md px-2 py-1',
-            disabled && 'opacity-50'
-          )}
-          accessibilityRole="button">
-          <Text className="text-muted-foreground text-sm">{displayLabel}</Text>
-          <Icon as={ChevronDown} className="text-muted-foreground size-3" />
-        </Pressable>
-      </SelectPrimitive.Trigger>
+      <ToolSelectTrigger disabled={disabled} displayLabel={displayLabel} />
 
       <SelectPrimitive.Portal>
         <SelectPrimitive.Overlay
