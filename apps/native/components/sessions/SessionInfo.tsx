@@ -73,7 +73,9 @@ export function SessionInfo({ session, size = 'default', context = 'list' }: Ses
               </Text>
             </View>
           )}
-          <Icon as={Folder} className="text-muted-foreground ml-1.5 size-3" />
+          <View className="ml-2">
+            <Icon as={Folder} className="text-muted-foreground size-3" />
+          </View>
           <Text className="text-muted-foreground ml-1 flex-1 font-mono text-xs" numberOfLines={1}>
             {truncatePath(session.projectName, pathMaxLength)}
           </Text>
