@@ -99,14 +99,14 @@ export default function ArtifactsScreen() {
             <View className="mb-3 flex-row items-center">
               <Icon as={MapIcon} className="text-muted-foreground size-5" />
               <Text className="text-foreground ml-2 font-semibold">Implementation Plan</Text>
-              {artifacts.plan.messageUuid && (
+              {artifacts.plan.messageUuid ? (
                 <Pressable
                   onPress={handleViewPlanInChat}
                   className="bg-muted ml-auto flex-row items-center gap-1 rounded-md px-2 py-1 active:opacity-70">
                   <Icon as={ExternalLinkIcon} className="text-muted-foreground size-3" />
                   <Text className="text-muted-foreground text-xs">View in Chat</Text>
                 </Pressable>
-              )}
+              ) : null}
             </View>
             {artifacts.plan.content ? (
               <MarkdownContent content={artifacts.plan.content} />

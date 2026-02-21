@@ -65,14 +65,14 @@ export function SessionInfo({ session, size = 'default', context = 'list' }: Ses
           <Text className={`font-mono text-xs ${colors.text}`}>
             {showTime ? timeAgo : statusInfo.label}
           </Text>
-          {session.gitBranch && (
+          {session.gitBranch ? (
             <View className="bg-muted ml-1.5 flex-row items-center gap-0.5 rounded-sm px-1 py-px">
               <Icon as={GitBranchIcon} className="text-muted-foreground size-3" />
               <Text className="text-muted-foreground font-mono text-xs" numberOfLines={1}>
                 {session.gitBranch}
               </Text>
             </View>
-          )}
+          ) : null}
           <View className="ml-2">
             <Icon as={Folder} className="text-muted-foreground size-3" />
           </View>

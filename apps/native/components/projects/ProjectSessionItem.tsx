@@ -80,14 +80,14 @@ export function ProjectSessionItem({
               {showTime ? timeAgo : statusInfo.label}
             </Text>
 
-            {session.gitBranch && (
+            {session.gitBranch ? (
               <View className="bg-muted flex-row items-center gap-1 rounded-sm px-1.5 py-0.5">
                 <Icon as={GitBranchIcon} className="text-muted-foreground size-3" />
                 <Text className="text-muted-foreground font-mono text-xs" numberOfLines={1}>
                   {session.gitBranch}
                 </Text>
               </View>
-            )}
+            ) : null}
           </View>
         </View>
       </View>

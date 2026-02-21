@@ -52,11 +52,11 @@ export function ConnectionInfo() {
       </View>
 
       {/* Error if any */}
-      {connectionState.error && (
+      {connectionState.error ? (
         <View className="bg-destructive/10 mb-1 rounded px-2 py-1">
           <Text className="text-destructive text-xs">{connectionState.error}</Text>
         </View>
-      )}
+      ) : null}
 
       {/* Last connected */}
       <View className="flex-row items-center justify-between">

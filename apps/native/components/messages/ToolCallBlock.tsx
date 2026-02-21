@@ -344,11 +344,11 @@ export function ToolCallBlock({
             <Shimmer isShimmering={isPending}>
               <Text className="text-foreground text-sm font-medium">{name}</Text>
             </Shimmer>
-            {description && (
+            {description ? (
               <Text className="text-muted-foreground flex-1 font-mono text-sm" numberOfLines={1}>
                 {description}
               </Text>
-            )}
+            ) : null}
             {isPending && (
               <Shimmer isShimmering>
                 <Text className="text-muted-foreground text-xs">Running...</Text>

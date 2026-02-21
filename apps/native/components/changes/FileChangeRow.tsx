@@ -78,11 +78,11 @@ export function FileChangeRow({ change, expanded, onToggle }: FileChangeRowProps
                 </Text>
               </View>
             </View>
-            {dirPath && (
+            {dirPath ? (
               <Text className="text-muted-foreground text-xs" numberOfLines={1}>
                 {dirPath}
               </Text>
-            )}
+            ) : null}
           </View>
 
           {/* Change counts */}
