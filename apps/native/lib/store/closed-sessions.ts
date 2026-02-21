@@ -1,10 +1,12 @@
 /**
  * Closed session message loading.
- * Loads messages for closed sessions from SQLite on demand.
+ *
+ * Base persists canonical messages into SQLite. Native loads session messages
+ * on demand into TinyBase for UI rendering.
  */
 
 import { Platform } from 'react-native';
-import type { ModelId } from '@arc0/types';
+import type { SocketMessage } from '@arc0/types';
 import type { Indexes, Store } from 'tinybase';
 import { executeQuery } from './persister';
 
@@ -12,9 +14,6 @@ import { executeQuery } from './persister';
 // Types
 // =============================================================================
 
-/**
- * Message row from SQLite query.
- */
 interface MessageRow {
   id: string;
   session_id: string;
@@ -27,112 +26,63 @@ interface MessageRow {
   raw_json: string | null;
 }
 
-/**
- * Parse local command from XML content.
- */
-function parseLocalCommand(content: string): { commandName: string; commandArgs: string } | null {
-  const nameMatch = content.match(/<command-name>([^<]+)<\/command-name>/);
-  const argsMatch = content.match(/<command-args>([^<]*)<\/command-args>/);
-  if (!nameMatch) return null;
-  return {
-    commandName: nameMatch[1],
-    commandArgs: argsMatch?.[1] || '',
-  };
-}
+type TinyBaseRow = Record<string, string | number>;
 
-/**
- * Parse command output from XML content.
- */
-function parseCommandOutput(content: string): { stdout?: string; stderr?: string } | null {
-  const stdoutMatch = content.match(/<local-command-stdout>([\s\S]*?)<\/local-command-stdout>/);
-  const stderrMatch = content.match(/<local-command-stderr>([\s\S]*?)<\/local-command-stderr>/);
-  if (!stdoutMatch && !stderrMatch) return null;
-  return {
-    stdout: stdoutMatch?.[1],
-    stderr: stderrMatch?.[1],
-  };
-}
-
-/**
- * Strip ANSI escape sequences from text.
- */
-function stripAnsi(text: string): string {
-  // eslint-disable-next-line no-control-regex
-  return text.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
-}
-
-function parseModelIdFromClaudeModelOutput(stdout: string): ModelId | null {
-  const text = stdout.toLowerCase();
-
-  // Only treat explicit "set/kept model" outputs as authoritative.
-  if (!text.includes('set model to') && !text.includes('kept model as')) {
+function parseSocketMessage(rawJson: string | null): SocketMessage | null {
+  if (!rawJson) return null;
+  try {
+    return JSON.parse(rawJson) as SocketMessage;
+  } catch {
     return null;
   }
-
-  if (text.includes('default')) return 'default';
-  if (text.includes('opus')) return 'opus-4.5';
-  if (text.includes('sonnet')) return 'sonnet-4.5';
-  if (text.includes('haiku')) return 'haiku-4.5';
-
-  return null;
 }
 
-/**
- * Check if raw payload is a meta line that should be skipped.
- */
-function isMetaLine(payload: unknown): boolean {
-  if (!payload || typeof payload !== 'object') return false;
-  const p = payload as Record<string, unknown>;
-  return p.isMeta === true;
+type LocalCommandOutputMessage = Extract<SocketMessage, { type: 'system' }> & {
+  subtype: 'local_command';
+  parentUuid: string;
+  commandName?: undefined;
+  stdout?: string;
+  stderr?: string;
+};
+
+function isLocalCommandOutputMessage(msg: SocketMessage): msg is LocalCommandOutputMessage {
+  return (
+    msg.type === 'system' &&
+    msg.subtype === 'local_command' &&
+    typeof msg.parentUuid === 'string' &&
+    msg.commandName === undefined &&
+    (typeof msg.stdout === 'string' || typeof msg.stderr === 'string')
+  );
 }
 
-/**
- * Extract text content from raw JSONL payload.
- */
-function extractTextContent(payload: unknown): string {
-  if (!payload || typeof payload !== 'object') return '';
-  const p = payload as Record<string, unknown>;
-  const message = p.message as Record<string, unknown> | undefined;
-  if (!message?.content) return '';
+function parseClaudeModelFromStdout(stdout: string): string | null {
+  const match = stdout.match(/(?:Set model to|Kept model as)\s+([^\n\r(]+)/i);
+  const name = match?.[1]?.trim();
+  if (!name) return null;
 
-  const content = message.content;
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
-      .filter((b): b is { type: 'text'; text: string } => (b as { type?: string })?.type === 'text')
-      .map((b) => b.text)
-      .join('\n');
-  }
-  return '';
+  const lower = name.toLowerCase();
+  if (lower.startsWith('opus')) return 'opus-4.5';
+  if (lower.startsWith('sonnet')) return 'sonnet-4.5';
+  if (lower.startsWith('haiku')) return 'haiku-4.5';
+  if (lower.startsWith('default')) return 'default';
+
+  return name;
 }
 
 // =============================================================================
 // Load Session Messages
 // =============================================================================
 
-/**
- * Load messages for a session from SQLite into the TinyBase store.
- * Works for both open and closed sessions - messages are loaded on demand.
- * Uses the messagesBySession index for O(1) check if messages are already loaded.
- *
- * @param store - TinyBase store instance
- * @param indexes - TinyBase indexes instance
- * @param sessionId - Session ID to load messages for
- * @returns true if messages were loaded, false if already present
- */
 export async function loadSessionMessages(
   store: Store,
   indexes: Indexes,
   sessionId: string
 ): Promise<boolean> {
-  // Check if already loaded using index (O(1) lookup instead of O(n) iteration)
   const messageIds = indexes.getSliceRowIds('messagesBySession', sessionId);
   if (messageIds.length > 0) {
-    // Already loaded, skip
     return false;
   }
 
-  // Query SQLite for messages (including raw_json for local command detection)
   const messages = await executeQuery<MessageRow>(
     'SELECT id, session_id, parent_id, type, timestamp, content, stop_reason, usage, raw_json FROM messages WHERE session_id = ? ORDER BY timestamp',
     [sessionId]
@@ -142,123 +92,70 @@ export async function loadSessionMessages(
     return false;
   }
 
-  // Process messages using two-pass approach with parentUuid matching
-  // This ensures outputs are correctly merged with commands even if not immediately adjacent
-  type TinyBaseRow = Record<string, string | number>;
-
-  // First pass: build command map, collect outputs, and build ordered message list
+  // Two-pass merge:
+  // - Pass 1: collect command rows and output rows (by parentId)
+  // - Pass 2: append stdout/stderr into command rows
   const commandsById = new Map<string, { id: string; row: TinyBaseRow }>();
-  const processedMessages: { id: string; row: TinyBaseRow }[] = [];
-  const outputMessages: { parentId: string; stdout?: string; stderr?: string }[] = [];
+  const processed: { id: string; row: TinyBaseRow }[] = [];
+  const outputs: { parentId: string; stdout?: string; stderr?: string }[] = [];
 
-  for (const msg of messages) {
-    // Parse raw_json to detect local commands and meta lines
-    let rawPayload: unknown = null;
-    if (msg.raw_json) {
-      try {
-        rawPayload = JSON.parse(msg.raw_json);
-      } catch {
-        // Ignore parse errors
+  for (const row of messages) {
+    const parsed = parseSocketMessage(row.raw_json);
+
+    // Local command output messages are stored in SQLite as separate rows.
+    // For UI, we merge them into the parent command message row.
+    if (parsed && isLocalCommandOutputMessage(parsed)) {
+      const parentId = parsed.parentUuid ?? row.parent_id ?? '';
+      if (parentId) {
+        outputs.push({ parentId, stdout: parsed.stdout, stderr: parsed.stderr });
       }
-    }
-
-    // Skip meta lines (caveat messages)
-    if (rawPayload && isMetaLine(rawPayload)) {
       continue;
     }
 
-    // Extract text content for local command detection
-    const textContent = rawPayload ? extractTextContent(rawPayload) : '';
+    // Build TinyBase row from SQLite columns.
+    const base: TinyBaseRow = {
+      session_id: row.session_id,
+      parent_id: row.parent_id ?? '',
+      type: row.type,
+      timestamp: row.timestamp,
+      content: row.content,
+      stop_reason: row.stop_reason ?? '',
+      usage: row.usage ?? '{}',
+    };
 
-    // Check if this is a local command message
-    const commandInfo = parseLocalCommand(textContent);
-    if (commandInfo) {
-      const row: TinyBaseRow = {
-        session_id: msg.session_id,
-        parent_id: msg.parent_id ?? '',
-        type: 'system',
-        subtype: 'local_command',
-        timestamp: msg.timestamp,
-        content: '[]',
-        stop_reason: '',
-        usage: '{}',
-        command_name: commandInfo.commandName,
-        command_args: commandInfo.commandArgs,
-      };
-      const entry = { id: msg.id, row };
-      commandsById.set(msg.id, entry);
-      processedMessages.push(entry); // Add in order
-      continue;
+    // System message extras come from canonical raw_json.
+    if (parsed?.type === 'system') {
+      if (parsed.subtype) base.subtype = parsed.subtype;
+      if (parsed.commandName) base.command_name = parsed.commandName;
+      if (parsed.commandArgs) base.command_args = parsed.commandArgs;
+      if (parsed.stdout !== undefined) base.stdout = parsed.stdout;
+      if (parsed.stderr !== undefined) base.stderr = parsed.stderr;
     }
 
-    // Check if this is a command output message
-    const outputInfo = parseCommandOutput(textContent);
-    if (outputInfo) {
-      const parentId = msg.parent_id ?? '';
-      outputMessages.push({
-        parentId,
-        stdout: outputInfo.stdout ? stripAnsi(outputInfo.stdout) : undefined,
-        stderr: outputInfo.stderr ? stripAnsi(outputInfo.stderr) : undefined,
-      });
-      // Don't add outputs to processedMessages - they're merged into commands
-      continue;
+    const entry = { id: row.id, row: base };
+    if (parsed?.type === 'system' && parsed.subtype === 'local_command') {
+      commandsById.set(row.id, entry);
     }
-
-    // Regular message - add in order
-    processedMessages.push({
-      id: msg.id,
-      row: {
-        session_id: msg.session_id,
-        parent_id: msg.parent_id ?? '',
-        type: msg.type,
-        timestamp: msg.timestamp,
-        content: msg.content,
-        stop_reason: msg.stop_reason ?? '',
-        usage: msg.usage ?? '{}',
-      },
-    });
+    processed.push(entry);
   }
 
-  // Second pass: merge outputs into their parent commands using parentId
-  // Uses append logic to handle multiple outputs for the same command
-  for (const output of outputMessages) {
-    const parentCommand = commandsById.get(output.parentId);
-    if (parentCommand) {
-      // Append stdout if exists, otherwise set
-      if (output.stdout) {
-        const existingStdout = parentCommand.row.stdout as string | undefined;
-        if (existingStdout) {
-          parentCommand.row.stdout = existingStdout + '\n' + output.stdout;
-        } else {
-          parentCommand.row.stdout = output.stdout;
-        }
-      }
-      // Append stderr if exists, otherwise set
-      if (output.stderr) {
-        const existingStderr = parentCommand.row.stderr as string | undefined;
-        if (existingStderr) {
-          parentCommand.row.stderr = existingStderr + '\n' + output.stderr;
-        } else {
-          parentCommand.row.stderr = output.stderr;
-        }
-      }
-    } else if (output.parentId) {
-      // Log orphaned output for debugging (parent command not found in this session)
-      console.log('[closed-sessions] orphaned command output - parent not found', {
-        parentId: output.parentId,
-        sessionId,
-        hasStdout: !!output.stdout,
-        hasStderr: !!output.stderr,
-      });
+  for (const out of outputs) {
+    const parent = commandsById.get(out.parentId);
+    if (!parent) continue;
+
+    if (out.stdout) {
+      const existing = parent.row.stdout as string | undefined;
+      parent.row.stdout = existing ? `${existing}\n${out.stdout}` : out.stdout;
+    }
+    if (out.stderr) {
+      const existing = parent.row.stderr as string | undefined;
+      parent.row.stderr = existing ? `${existing}\n${out.stderr}` : out.stderr;
     }
   }
 
-  // Insert into TinyBase store for UI reactivity
-  // Note: 'id' is NOT included as cell data - it's the row ID (rowIdColumnName: 'id')
   const derivedModel = (() => {
-    // Walk backwards to find the most recent `/model` command output.
-    for (let i = processedMessages.length - 1; i >= 0; i--) {
-      const row = processedMessages[i]?.row;
+    for (let i = processed.length - 1; i >= 0; i--) {
+      const row = processed[i]?.row;
       if (!row) continue;
       if (row.subtype !== 'local_command') continue;
       if (row.command_name !== '/model') continue;
@@ -266,14 +163,14 @@ export async function loadSessionMessages(
       const stdout = row.stdout;
       if (typeof stdout !== 'string' || stdout.length === 0) continue;
 
-      const model = parseModelIdFromClaudeModelOutput(stdout);
+      const model = parseClaudeModelFromStdout(stdout);
       if (model) return model;
     }
     return null;
   })();
 
   store.transaction(() => {
-    for (const { id, row } of processedMessages) {
+    for (const { id, row } of processed) {
       store.setRow('messages', id, row);
     }
     if (derivedModel) {
@@ -284,90 +181,39 @@ export async function loadSessionMessages(
   console.log('[closed-sessions] Loaded messages for session:', {
     sessionId,
     rawCount: messages.length,
-    processedCount: processedMessages.length,
+    processedCount: processed.length,
   });
 
   return true;
 }
 
-/**
- * Check if messages for a session are loaded in the store.
- *
- * @param indexes - TinyBase indexes instance
- * @param sessionId - Session ID to check
- * @returns true if messages are already loaded
- */
 export function areMessagesLoaded(indexes: Indexes, sessionId: string): boolean {
-  const messageIds = indexes.getSliceRowIds('messagesBySession', sessionId);
-  return messageIds.length > 0;
+  return indexes.getSliceRowIds('messagesBySession', sessionId).length > 0;
 }
 
-/**
- * Get message count for a session from the store (for already loaded sessions).
- *
- * @param indexes - TinyBase indexes instance
- * @param sessionId - Session ID to get count for
- * @returns Number of messages loaded in store for this session
- */
 export function getLoadedMessageCount(indexes: Indexes, sessionId: string): number {
   return indexes.getSliceRowIds('messagesBySession', sessionId).length;
 }
 
-/**
- * Remove messages for a session from the TinyBase store.
- * Use this to free memory when navigating away from closed sessions.
- *
- * NOTE: This is an optimization for memory management.
- * Messages remain in SQLite and can be reloaded on demand.
- *
- * @param store - TinyBase store instance
- * @param indexes - TinyBase indexes instance
- * @param sessionId - Session ID to unload messages for
- */
 export function unloadSessionMessages(store: Store, indexes: Indexes, sessionId: string): void {
   const messageIds = indexes.getSliceRowIds('messagesBySession', sessionId);
-
-  if (messageIds.length === 0) {
-    return;
-  }
+  if (messageIds.length === 0) return;
 
   store.transaction(() => {
     for (const messageId of messageIds) {
       store.delRow('messages', messageId);
     }
   });
-
-  console.log('[closed-sessions] Unloaded messages for session:', {
-    sessionId,
-    messageCount: messageIds.length,
-  });
 }
 
-/**
- * Unload messages for the previous active session when switching sessions.
- * Unloads ALL sessions (both open and closed) - only active route keeps messages.
- *
- * NOTE: Only applies to native. On web, all messages stay in TinyBase (persisted to OPFS).
- *
- * @param store - TinyBase store instance
- * @param indexes - TinyBase indexes instance
- * @param previousSessionId - Session ID that was previously active
- * @param currentSessionId - Session ID that is now active
- */
 export function handleActiveSessionChange(
   store: Store,
   indexes: Indexes,
   previousSessionId: string,
   currentSessionId: string
 ): void {
-  // Skip on web - OPFS persists entire TinyBase store, unloading would lose messages
-  if (Platform.OS === 'web') {
-    return;
-  }
-
-  if (!previousSessionId || previousSessionId === currentSessionId) {
-    return;
-  }
-
+  // Skip on web - OPFS persists the whole store.
+  if (Platform.OS === 'web') return;
+  if (!previousSessionId || previousSessionId === currentSessionId) return;
   unloadSessionMessages(store, indexes, previousSessionId);
 }

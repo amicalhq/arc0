@@ -25,8 +25,8 @@ import type {
   PairCompletePayload,
   PairErrorPayload,
 } from "@arc0/types";
-import { addClient } from "../shared/clients.js";
-import { loadConfig } from "../shared/config.js";
+import { addClient } from "../lib/clients.js";
+import { loadConfig } from "../lib/config.js";
 
 // Pairing session expires after 5 minutes
 const PAIRING_TIMEOUT_MS = 5 * 60 * 1000;

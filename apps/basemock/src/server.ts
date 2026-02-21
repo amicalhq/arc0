@@ -7,10 +7,13 @@ import { Server, Socket } from "socket.io";
 import { createServer, Server as HttpServer } from "http";
 import { randomUUID, timingSafeEqual } from "crypto";
 import type {
+  ContentBlock as CanonicalContentBlock,
+  SocketMessage as CanonicalSocketMessage,
+} from "@arc0/types";
+import type {
   JSONLPayload,
   MessagesBatchPayload,
   MockSession,
-  RawMessageEnvelope,
   ServerState,
   SessionsSyncPayload,
   ClientInfo,
@@ -20,6 +23,7 @@ import type {
   SendPromptPayload,
   StopAgentPayload,
   ApproveToolUsePayload,
+  TimelineItem,
 } from "./types.js";
 export type { ClientInfo };
 import {
@@ -210,10 +214,7 @@ export function startServer(options: StartServerOptions = {}): Promise<void> {
           payload: SendPromptPayload,
           ack: (result: ActionResult) => void,
         ) => {
-          logger.info(
-            "sendPrompt",
-            `session=${payload.sessionId.slice(0, 8)} model=${payload.model} mode=${payload.mode}`,
-          );
+          logger.info("sendPrompt", `session=${payload.sessionId.slice(0, 8)}`);
           logger.info(
             "  text",
             payload.text.slice(0, 50) + (payload.text.length > 50 ? "..." : ""),
@@ -492,16 +493,88 @@ export async function sendMessagesBatch(
     return;
   }
 
-  // Wrap messages as raw envelopes (matching Base service format)
-  // sessionId is in the envelope, not in the JSONL payload
-  const envelopes: RawMessageEnvelope[] = messages.map((msg) => ({
-    sessionId,
-    payload: msg, // Send the full raw JSONL message as payload
-  }));
+  const toCanonicalBlocks = (content: unknown): CanonicalContentBlock[] => {
+    if (typeof content === "string") {
+      return [{ type: "text", text: content }];
+    }
+    if (!Array.isArray(content)) {
+      return [{ type: "text", text: String(content) }];
+    }
+
+    return content.map((b: any): CanonicalContentBlock => {
+      switch (b?.type) {
+        case "text":
+          return { type: "text", text: String(b.text ?? "") };
+        case "thinking":
+          return {
+            type: "thinking",
+            thinking: String(b.thinking ?? ""),
+            thinkingSignature:
+              typeof b.signature === "string" ? b.signature : undefined,
+          };
+        case "tool_use":
+          return {
+            type: "tool_use",
+            id: String(b.id ?? ""),
+            name: String(b.name ?? ""),
+            input: (b.input ?? {}) as Record<string, unknown>,
+          };
+        case "tool_result":
+          return {
+            type: "tool_result",
+            tool_use_id: String(b.tool_use_id ?? ""),
+            content:
+              typeof b.content === "string"
+                ? b.content
+                : JSON.stringify(b.content),
+            is_error: Boolean(b.is_error),
+          };
+        default:
+          return { type: "text", text: JSON.stringify(b) };
+      }
+    });
+  };
+
+  const items: TimelineItem[] = [];
+
+  for (const msg of messages) {
+    // Only convert conversation messages; ignore metadata-only lines for now.
+    if (!msg || typeof msg !== "object") continue;
+    const type = (msg as any).type;
+    if (type !== "user" && type !== "assistant") continue;
+
+    const raw = msg as any;
+    const content = toCanonicalBlocks(raw.message?.content);
+
+    const canonical: CanonicalSocketMessage = {
+      type,
+      uuid: String(raw.uuid),
+      sessionId,
+      parentUuid: raw.parentUuid ?? null,
+      timestamp: String(raw.timestamp),
+      content,
+      ...(type === "assistant" && {
+        stopReason:
+          raw.message?.stop_reason === "tool_use" ||
+          raw.message?.stop_reason === "end_turn"
+            ? raw.message.stop_reason
+            : null,
+        usage: raw.message?.usage
+          ? {
+              inputTokens: Number(raw.message.usage.input_tokens ?? 0),
+              outputTokens: Number(raw.message.usage.output_tokens ?? 0),
+            }
+          : undefined,
+        model: raw.message?.model ?? null,
+      }),
+    };
+
+    items.push({ kind: "message", message: canonical });
+  }
 
   const payload: MessagesBatchPayload = {
     workstationId: state.workstationId,
-    messages: envelopes,
+    items,
     batchId: randomUUID(),
   };
 

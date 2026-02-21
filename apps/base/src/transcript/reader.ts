@@ -1,5 +1,5 @@
 /**
- * JSONL file reader and parser.
+ * JSONL transcript reader and parser.
  * Handles reading entire files or incremental reads from a byte position.
  */
 

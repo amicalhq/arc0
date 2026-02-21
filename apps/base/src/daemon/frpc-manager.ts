@@ -1,3 +1,7 @@
+/**
+ * frpc tunnel process manager (daemon runtime).
+ */
+
 import { spawn, type ChildProcess } from "node:child_process";
 import { appendFileSync, writeFileSync } from "node:fs";
 import {
@@ -6,9 +10,9 @@ import {
   FRPC_LOG,
   TUNNEL_DOMAIN,
   type Arc0Config,
-} from "../shared/config.js";
-import { loadCredentials } from "../shared/credentials.js";
-import { frpcExists, generateFrpcConfig } from "../shared/frpc.js";
+} from "../lib/config.js";
+import { loadCredentials } from "../lib/credentials.js";
+import { frpcExists, generateFrpcConfig } from "../lib/frpc.js";
 
 export type TunnelStatus =
   | "disabled"

@@ -1,6 +1,6 @@
 import * as p from "@clack/prompts";
-import { isDaemonLocked } from "../../shared/lock.js";
-import { readDaemonState, removeDaemonState } from "../../shared/pid.js";
+import { isDaemonLocked } from "../../lib/lock.js";
+import { readDaemonState, removeDaemonState } from "../../lib/pid.js";
 
 export async function stopCommand(): Promise<void> {
   if (!(await isDaemonLocked())) {

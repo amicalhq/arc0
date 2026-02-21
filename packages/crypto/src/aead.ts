@@ -114,10 +114,11 @@ export function isEncryptedEnvelope(obj: unknown): obj is EncryptedEnvelope {
 // Base64 utilities (work in both Node.js and browser)
 
 function uint8ArrayToBase64(bytes: Uint8Array): string {
-  // Use built-in btoa in browser, Buffer in Node.js
-  if (typeof Buffer !== "undefined") {
-    return Buffer.from(bytes).toString("base64");
-  }
+  // Use btoa in browser, and globalThis.Buffer when available.
+  // We intentionally avoid referencing `Buffer` directly so consumers without Node typings
+  // (e.g., React Native / Expo) can still typecheck.
+  const NodeBuffer: any = (globalThis as any).Buffer;
+  if (NodeBuffer) return NodeBuffer.from(bytes).toString("base64");
   let binary = "";
   for (let i = 0; i < bytes.length; i++) {
     binary += String.fromCharCode(bytes[i]!);
@@ -126,10 +127,10 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
 }
 
 function base64ToUint8Array(base64: string): Uint8Array {
-  // Use built-in atob in browser, Buffer in Node.js
-  if (typeof Buffer !== "undefined") {
-    return new Uint8Array(Buffer.from(base64, "base64"));
-  }
+  // Use atob in browser, and globalThis.Buffer when available.
+  // See uint8ArrayToBase64() for why we use globalThis here.
+  const NodeBuffer: any = (globalThis as any).Buffer;
+  if (NodeBuffer) return new Uint8Array(NodeBuffer.from(base64, "base64"));
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {

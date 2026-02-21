@@ -3,10 +3,10 @@ import { spawn } from "node:child_process";
 import { openSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { isDaemonLocked } from "../../shared/lock.js";
-import { readDaemonState, removeDaemonState } from "../../shared/pid.js";
-import { LOG_FILE } from "../../shared/config.js";
-import { isCompiledBinary } from "../../shared/runtime.js";
+import { isDaemonLocked } from "../../lib/lock.js";
+import { readDaemonState, removeDaemonState } from "../../lib/pid.js";
+import { LOG_FILE } from "../../lib/config.js";
+import { isCompiledBinary } from "../../lib/runtime.js";
 
 export async function restartCommand(): Promise<void> {
   const wasRunning = await isDaemonLocked();

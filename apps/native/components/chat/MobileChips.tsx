@@ -5,7 +5,7 @@
 
 import { Pressable, View } from 'react-native';
 import { ChevronDown } from 'lucide-react-native';
-import type { ModelId, PromptMode } from '@arc0/types';
+import type { ModelId, PromptMode } from '@/lib/types/prompt';
 import { Text } from '@/components/ui/text';
 import { Icon } from '@/components/ui/icon';
 import { MODE_OPTIONS, MODEL_OPTIONS } from './InlineSelectors';

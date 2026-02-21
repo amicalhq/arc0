@@ -1,6 +1,6 @@
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { VERSION, loadConfig, type Arc0Config } from "../shared/config.js";
+import { VERSION, loadConfig, type Arc0Config } from "../lib/config.js";
 import { startCommand } from "./commands/start.js";
 import { stopCommand } from "./commands/stop.js";
 import { restartCommand } from "./commands/restart.js";

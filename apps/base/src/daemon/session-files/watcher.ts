@@ -2,9 +2,9 @@ import { watch, type FSWatcher } from "chokidar";
 import { readFileSync, existsSync, mkdirSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { SessionEvent } from "@arc0/types";
-import { SESSIONS_DIR } from "../../shared/config.js";
-import { eventBus } from "../../shared/events.js";
-import type { SessionFile } from "../../shared/types.js";
+import { SESSIONS_DIR } from "../../lib/config.js";
+import { eventBus } from "../../lib/events.js";
+import type { SessionFile } from "../../lib/types.js";
 
 /**
  * Watches ~/.arc0/sessions/ for session files created by hooks.

@@ -1,32 +1,30 @@
-import {
-  createServer,
-  type IncomingMessage,
-  type ServerResponse,
-} from "node:http";
+import { createServer } from "node:http";
 import { Server, type Socket } from "socket.io";
+import { ARC0_PROTOCOL_VERSION } from "@arc0/types";
 import type {
-  RawMessagesBatchPayload,
-  ProjectsSyncPayload,
-  SendPromptPayload,
-  ApproveToolUsePayload,
-  StopAgentPayload,
-  OpenSessionPayload,
   ActionResult,
-  PairInitPayload,
-  PairConfirmPayload,
+  ApproveToolUsePayload,
   EncryptedEnvelope,
+  OpenSessionPayload,
+  PairConfirmPayload,
+  PairInitPayload,
+  ProjectsSyncPayload,
+  ProtocolErrorPayload,
+  SendPromptPayload,
+  StopAgentPayload,
+  TimelineBatchPayload,
 } from "@arc0/types";
-import { isEncryptedEnvelope } from "@arc0/crypto";
+import { base64ToUint8Array, isEncryptedEnvelope } from "@arc0/crypto";
 import type {
   ClientInfo,
   InitPayload,
   SessionCursor,
   SessionData,
   SessionsSyncPayload,
-} from "../shared/types.js";
-import { safeCompare } from "../shared/credentials.js";
-import { validateClient, touchClient, getClient } from "../shared/clients.js";
-import { pairingManager, type PairingResult } from "./pairing.js";
+} from "../lib/types.js";
+import { safeCompare } from "../lib/credentials.js";
+import { validateClient, touchClient, getClient } from "../lib/clients.js";
+import { pairingManager } from "./pairing.js";
 import {
   registerEncryptionContext,
   removeEncryptionContext,
@@ -34,210 +32,9 @@ import {
   decryptFromClient,
   hasEncryptionContext,
 } from "./encryption.js";
-import { base64ToUint8Array } from "@arc0/crypto";
 import type { ActionHandlers } from "./actions.js";
-import { MessageQueueManager, type QueuedBatch } from "./message-queue.js";
-
-export interface ServerStatus {
-  running: boolean;
-  uptime: number;
-  clientCount: number;
-  sessionCount: number;
-}
-
-// =============================================================================
-// ControlServer - HTTP API for CLI (localhost only)
-// =============================================================================
-
-export interface ControlServerOptions {
-  preferredPort?: number;
-  onReady?: (port: number) => void;
-}
-
-export class ControlServer {
-  private httpServer: ReturnType<typeof createServer>;
-  private startTime = Date.now();
-  private _port = 0;
-  private tunnelStopHandler?: () => Promise<void>;
-  private pairingCompletedDevice?: { deviceId: string; deviceName: string };
-
-  // References to socket server for status
-  private getClientCount: () => number = () => 0;
-  private getSessionCount: () => number = () => 0;
-  private getSessions: () => SessionData[] = () => [];
-  private getClients: () => ClientInfo[] = () => [];
-
-  constructor(options: ControlServerOptions = {}) {
-    this.httpServer = createServer((req, res) => this.handleRequest(req, res));
-
-    // Setup pairing completion callback
-    pairingManager.onComplete((result: PairingResult) => {
-      this.pairingCompletedDevice = {
-        deviceId: result.deviceId,
-        deviceName: result.deviceName,
-      };
-    });
-
-    const startListening = (port: number) => {
-      this.httpServer.listen(port, "127.0.0.1", () => {
-        const addr = this.httpServer.address();
-        if (addr && typeof addr === "object") {
-          this._port = addr.port;
-          console.log(`[control] Listening on 127.0.0.1:${this._port}`);
-          options.onReady?.(this._port);
-        }
-      });
-    };
-
-    // Try preferred port first, fall back to OS-assigned port on conflict
-    if (options.preferredPort && options.preferredPort > 0) {
-      this.httpServer.once("error", (err: NodeJS.ErrnoException) => {
-        if (err.code === "EADDRINUSE") {
-          console.log(
-            `[control] Preferred port ${options.preferredPort} in use, falling back to OS-assigned`,
-          );
-          startListening(0);
-        } else {
-          throw err;
-        }
-      });
-      startListening(options.preferredPort);
-    } else {
-      startListening(0);
-    }
-  }
-
-  get port(): number {
-    return this._port;
-  }
-
-  /**
-   * Set references to socket server data for status API.
-   */
-  setDataProviders(providers: {
-    getClientCount: () => number;
-    getSessionCount: () => number;
-    getSessions: () => SessionData[];
-    getClients: () => ClientInfo[];
-  }): void {
-    this.getClientCount = providers.getClientCount;
-    this.getSessionCount = providers.getSessionCount;
-    this.getSessions = providers.getSessions;
-    this.getClients = providers.getClients;
-  }
-
-  /**
-   * Set handler for stopping the tunnel (called via API).
-   */
-  setTunnelStopHandler(handler: () => Promise<void>): void {
-    this.tunnelStopHandler = handler;
-  }
-
-  private handleRequest(req: IncomingMessage, res: ServerResponse): void {
-    res.setHeader("Content-Type", "application/json");
-
-    if (req.method === "GET" && req.url === "/api/status") {
-      const status: ServerStatus = {
-        running: true,
-        uptime: Math.floor((Date.now() - this.startTime) / 1000),
-        clientCount: this.getClientCount(),
-        sessionCount: this.getSessionCount(),
-      };
-      res.writeHead(200);
-      res.end(JSON.stringify(status));
-      return;
-    }
-
-    if (req.method === "GET" && req.url === "/api/clients") {
-      const clients = this.getClients().map((c) => ({
-        socketId: c.socketId,
-        deviceId: c.deviceId,
-        connectedAt: c.connectedAt.toISOString(),
-        lastAckAt: c.lastAckAt?.toISOString() ?? null,
-      }));
-      res.writeHead(200);
-      res.end(JSON.stringify({ clients }));
-      return;
-    }
-
-    if (req.method === "GET" && req.url === "/api/sessions") {
-      res.writeHead(200);
-      res.end(JSON.stringify({ sessions: this.getSessions() }));
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/tunnel/stop") {
-      if (this.tunnelStopHandler) {
-        this.tunnelStopHandler()
-          .then(() => {
-            res.writeHead(200);
-            res.end(JSON.stringify({ ok: true }));
-          })
-          .catch((err) => {
-            res.writeHead(500);
-            res.end(JSON.stringify({ error: String(err) }));
-          });
-      } else {
-        res.writeHead(200);
-        res.end(JSON.stringify({ ok: true, message: "No tunnel running" }));
-      }
-      return;
-    }
-
-    // Pairing API
-    if (req.method === "POST" && req.url === "/api/pairing/start") {
-      // Clear any previous completion state
-      this.pairingCompletedDevice = undefined;
-      const { code, formattedCode } = pairingManager.startPairing();
-      const expiresIn = pairingManager.getRemainingTime();
-      res.writeHead(200);
-      res.end(JSON.stringify({ code, formattedCode, expiresIn }));
-      console.log(`[control] Started pairing session: ${formattedCode}`);
-      return;
-    }
-
-    if (req.method === "GET" && req.url === "/api/pairing/status") {
-      const active = pairingManager.isPairingActive();
-      const code = pairingManager.getActiveCode();
-      const remainingMs = pairingManager.getRemainingTime();
-
-      // Check if pairing completed
-      if (this.pairingCompletedDevice) {
-        const { deviceId, deviceName } = this.pairingCompletedDevice;
-        this.pairingCompletedDevice = undefined; // Clear after reading
-        res.writeHead(200);
-        res.end(
-          JSON.stringify({
-            active: false,
-            completed: true,
-            deviceId,
-            deviceName,
-          }),
-        );
-        return;
-      }
-
-      res.writeHead(200);
-      res.end(JSON.stringify({ active, code, remainingMs, completed: false }));
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/pairing/cancel") {
-      pairingManager.cancelPairing();
-      this.pairingCompletedDevice = undefined;
-      res.writeHead(200);
-      res.end(JSON.stringify({ ok: true }));
-      return;
-    }
-
-    res.writeHead(404);
-    res.end(JSON.stringify({ error: "Not found" }));
-  }
-
-  close(): void {
-    this.httpServer.close();
-  }
-}
+import { MessageQueueManager } from "./message-queue.js";
+import type { ServerStatus } from "./types.js";
 
 // =============================================================================
 // SocketServer - Socket.IO for mobile (exposed via tunnel)
@@ -477,8 +274,24 @@ export class SocketServer {
     // Handle init (sent immediately after connect)
     socket.on("init", (payload: InitPayload) => {
       console.log(
-        `[socket] Init: ${socket.id} device=${payload.deviceId} cursors=${payload.cursor.length}`,
+        `[socket] Init: ${socket.id} device=${payload.deviceId} cursors=${payload.cursor.length} protocol=${payload.protocolVersion}`,
       );
+
+      // Refuse to proceed if the client is speaking a different wire protocol.
+      // This prevents subtle/partial UI corruption when payload shapes change.
+      if (payload.protocolVersion !== ARC0_PROTOCOL_VERSION) {
+        const errorPayload: ProtocolErrorPayload = {
+          code: "PROTOCOL_MISMATCH",
+          expected: ARC0_PROTOCOL_VERSION,
+          received: payload.protocolVersion,
+          message: `Protocol mismatch (expected ${ARC0_PROTOCOL_VERSION}, got ${payload.protocolVersion}). Update Base and the client.`,
+        };
+        socket.emit("protocol:error", errorPayload);
+        // Give Socket.IO a tick to flush the event before disconnecting.
+        setImmediate(() => socket.disconnect(true));
+        return;
+      }
+
       const client = this.clients.get(socket.id);
       if (client) {
         client.deviceId = payload.deviceId;
@@ -664,7 +477,7 @@ export class SocketServer {
    */
   private emitMessage(
     socketId: string,
-    payload: RawMessagesBatchPayload,
+    payload: TimelineBatchPayload,
     encrypted: boolean,
     onAck: () => void,
   ): boolean {
@@ -800,7 +613,7 @@ export class SocketServer {
   /**
    * Send messages to all connected clients (queued with flow control).
    */
-  sendMessagesBatch(payload: RawMessagesBatchPayload): void {
+  sendMessagesBatch(payload: TimelineBatchPayload): void {
     if (this.clients.size === 0) return;
 
     // Queue for each authenticated client
@@ -813,7 +626,7 @@ export class SocketServer {
     }
 
     console.log(
-      `[socket] Queued messages (${payload.messages.length} messages, batch=${payload.batchId})`,
+      `[socket] Queued items (${payload.items.length} items, batch=${payload.batchId})`,
     );
   }
 
@@ -822,7 +635,7 @@ export class SocketServer {
    */
   sendMessagesBatchToClient(
     socketId: string,
-    payload: RawMessagesBatchPayload,
+    payload: TimelineBatchPayload,
   ): void {
     const socket = this.io.sockets.sockets.get(socketId);
     if (!socket) return;
@@ -831,7 +644,7 @@ export class SocketServer {
     this.messageQueue.enqueue(socketId, { payload, encrypted });
 
     console.log(
-      `[socket] Queued messages to ${socketId} (${payload.messages.length} messages)`,
+      `[socket] Queued items to ${socketId} (${payload.items.length} items)`,
     );
   }
 
@@ -840,7 +653,7 @@ export class SocketServer {
    */
   sendMessagesBatchToClientAsync(
     socketId: string,
-    payload: RawMessagesBatchPayload,
+    payload: TimelineBatchPayload,
   ): Promise<void> {
     return new Promise((resolve) => {
       const socket = this.io.sockets.sockets.get(socketId);

@@ -21,7 +21,8 @@ import {
   findLatestPendingTool,
   isNonInteractiveTool,
 } from '@/lib/utils/tool-state';
-import type { ModelId, PromptMode, AnswerItem, ToolResponse } from '@arc0/types';
+import type { ModelId, PromptMode } from '@/lib/types/prompt';
+import type { AnswerItem, ToolResponse } from '@arc0/types';
 import { useGlobalSearchParams, useLocalSearchParams } from 'expo-router';
 import { MessageSquareIcon } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';

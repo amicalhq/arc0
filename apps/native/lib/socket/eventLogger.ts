@@ -39,11 +39,22 @@ let cachedSnapshot: LoggedEvent[] = [];
 /**
  * Log a socket event.
  */
+function coerceDetails(details: unknown): Record<string, unknown> | undefined {
+  if (details === undefined) return undefined;
+  if (details === null) return { value: null };
+
+  if (typeof details === 'object') {
+    return Array.isArray(details) ? { items: details } : (details as Record<string, unknown>);
+  }
+
+  return { value: details };
+}
+
 export function logEvent(
   type: EventType,
   direction: LoggedEvent['direction'],
   summary: string,
-  details?: Record<string, unknown>
+  details?: unknown
 ): void {
   const event: LoggedEvent = {
     id: `evt-${++eventIdCounter}`,
@@ -51,7 +62,7 @@ export function logEvent(
     type,
     direction,
     summary,
-    details,
+    details: coerceDetails(details),
   };
 
   events.unshift(event); // Add to beginning

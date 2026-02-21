@@ -12,7 +12,7 @@ import {
   listClients,
   revokeClient,
   type ClientRecord,
-} from "../../shared/clients.js";
+} from "../../lib/clients.js";
 
 export async function clientsCommand(
   subcommand?: string,

@@ -7,16 +7,16 @@ import {
   FRPC_LOG,
   loadConfig,
   type Arc0Config,
-} from "../../shared/config.js";
-import { loadCredentials, updateTunnelAuth } from "../../shared/credentials.js";
+} from "../../lib/config.js";
+import { loadCredentials, updateTunnelAuth } from "../../lib/credentials.js";
 import {
   ensureFrpc,
   getFrpcVersion,
   frpcExists,
   generateRandomSubdomain,
   generateFrpcConfig,
-} from "../../shared/frpc.js";
-import { performDeviceAuth, validateToken } from "../../shared/device-auth.js";
+} from "../../lib/frpc.js";
+import { performDeviceAuth, validateToken } from "../../lib/device-auth.js";
 
 const TUNNEL_HELP = `
 ${pc.bold("arc0 tunnel")} - Manage Arc0 tunnel

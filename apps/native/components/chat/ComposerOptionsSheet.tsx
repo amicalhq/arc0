@@ -8,7 +8,7 @@ import { Keyboard, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Portal } from '@rn-primitives/portal';
 import { XIcon } from 'lucide-react-native';
-import type { ModelId, PromptMode } from '@arc0/types';
+import type { ModelId, PromptMode } from '@/lib/types/prompt';
 
 import { Icon } from '@/components/ui/icon';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';

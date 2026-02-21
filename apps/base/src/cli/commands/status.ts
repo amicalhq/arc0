@@ -1,15 +1,15 @@
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { existsSync } from "node:fs";
-import { isDaemonLocked } from "../../shared/lock.js";
-import { readDaemonState } from "../../shared/pid.js";
+import { isDaemonLocked } from "../../lib/lock.js";
+import { readDaemonState } from "../../lib/pid.js";
 import {
   TUNNEL_DOMAIN,
   loadConfig,
   type Arc0Config,
-} from "../../shared/config.js";
+} from "../../lib/config.js";
 import { PLIST_PATH, isLaunchAgentLoaded } from "./install.js";
-import { loadCredentials } from "../../shared/credentials.js";
+import { loadCredentials } from "../../lib/credentials.js";
 
 interface DaemonApiStatus {
   running: boolean;

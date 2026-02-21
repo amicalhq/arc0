@@ -5,7 +5,7 @@
  */
 
 import type { Indexes, Store } from 'tinybase';
-import type { ExtractedArtifact } from '../socket/artifact-extractor';
+import type { ExtractedArtifact } from '../artifacts';
 import { executeQuery, executeStatement, withTransaction } from './persister';
 
 // =============================================================================

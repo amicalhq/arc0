@@ -1,9 +1,8 @@
 /**
- * In-memory store for JSONL lines per session.
- * Only keeps lines for open/active sessions.
+ * In-memory store for JSONL transcript lines per session.
+ *
+ * Only keeps lines for open/active sessions to cap memory usage.
  */
-
-import type { RawMessageEnvelope } from "@arc0/types";
 
 /**
  * Raw JSONL line with minimal parsed fields for filtering.
@@ -117,19 +116,6 @@ class JsonlStore {
 
     // Filter lines with timestamp > lastMessageTs
     return session.lines.filter((line) => line.timestamp > lastMessageTs);
-  }
-
-  /**
-   * Wrap lines as RawMessageEnvelopes for sending.
-   */
-  wrapAsEnvelopes(
-    sessionId: string,
-    lines: StoredLine[],
-  ): RawMessageEnvelope[] {
-    return lines.map((line) => ({
-      sessionId,
-      payload: line.raw,
-    }));
   }
 
   /**

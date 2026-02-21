@@ -4,7 +4,7 @@
  */
 
 import { randomUUID } from "crypto";
-import type { SocketSessionData } from "@arc0/types";
+import type { SocketSession } from "@arc0/types";
 import type {
   ClaudeJSONLMessage,
   ContentBlock,
@@ -32,7 +32,7 @@ export function createMockSession(
   };
 }
 
-export function sessionToSessionData(session: MockSession): SocketSessionData {
+export function sessionToSessionData(session: MockSession): SocketSession {
   // Match Base service behavior: name, model, gitBranch are null
   // (these are extracted from JSONL, not session files)
   return {
@@ -43,6 +43,21 @@ export function sessionToSessionData(session: MockSession): SocketSessionData {
     model: null,
     gitBranch: null,
     startedAt: session.startedAt,
+    interactive: true,
+    capabilities: {
+      modelSwitch: {
+        supported: true,
+        kind: "command",
+        commandName: "/model",
+        options: [
+          { id: "default", label: "Default", command: "/model default" },
+          { id: "opus", label: "Opus", command: "/model Opus" },
+          { id: "sonnet", label: "Sonnet", command: "/model Sonnet" },
+          { id: "haiku", label: "Haiku", command: "/model Haiku" },
+        ],
+      },
+      approvals: { supported: true },
+    },
   };
 }
 

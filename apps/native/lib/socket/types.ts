@@ -13,9 +13,9 @@ export type {
   // Payloads
   InitPayload,
   SessionsSyncPayload,
-  MessagesBatchPayload,
-  RawMessageEnvelope,
-  RawMessagesBatchPayload,
+  TimelineBatchPayload,
+  TimelineItem,
+  ProtocolErrorPayload,
   // Pairing payloads
   PairInitPayload,
   PairChallengePayload,
@@ -27,8 +27,8 @@ export type {
   EncryptedEnvelope,
   SocketAuth,
   // Data types
-  SocketSessionData as SessionData,
-  SocketMessage as ClaudeJSONLMessage,
+  SocketSession as SessionData,
+  SocketMessage,
   SessionCursor,
   // Content blocks
   ContentBlock,

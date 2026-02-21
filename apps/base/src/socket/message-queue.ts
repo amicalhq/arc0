@@ -1,5 +1,5 @@
 /**
- * Per-client message queue manager for flow control.
+ * Per-client message queue manager for flow control (socket layer).
  *
  * Ensures batches are sent one at a time per client, waiting for
  * acknowledgment before sending the next batch.
@@ -9,10 +9,10 @@
  * cursor to catch up from where it left off.
  */
 
-import type { RawMessagesBatchPayload } from "@arc0/types";
+import type { TimelineBatchPayload } from "@arc0/types";
 
 export interface QueuedBatch {
-  payload: RawMessagesBatchPayload;
+  payload: TimelineBatchPayload;
   encrypted: boolean;
   resolve?: () => void; // For async waiting
 }
@@ -24,7 +24,7 @@ interface ClientQueue {
 
 export type EmitFn = (
   socketId: string,
-  payload: RawMessagesBatchPayload,
+  payload: TimelineBatchPayload,
   encrypted: boolean,
   onAck: () => void,
 ) => boolean;
@@ -123,7 +123,7 @@ export class MessageQueueManager {
     }
 
     console.log(
-      `[message-queue] Sent batch to ${socketId} (${batch.payload.messages.length} messages), pending=${queue.pending.length}`,
+      `[message-queue] Sent batch to ${socketId} (${batch.payload.items.length} items), pending=${queue.pending.length}`,
     );
   }
 

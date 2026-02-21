@@ -7,7 +7,7 @@ import { useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, TextInput, View } from 'react-native';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import { SendIcon } from 'lucide-react-native';
-import type { ModelId, PromptMode } from '@arc0/types';
+import type { ModelId, PromptMode } from '@/lib/types/prompt';
 
 import { Icon } from '@/components/ui/icon';
 import { THEME } from '@/lib/theme';

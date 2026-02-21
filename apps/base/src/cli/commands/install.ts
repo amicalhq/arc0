@@ -4,8 +4,8 @@ import { execSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { IS_DEV, CONFIG_DIR } from "../../shared/config.js";
-import { isCompiledBinary } from "../../shared/runtime.js";
+import { IS_DEV, CONFIG_DIR } from "../../lib/config.js";
+import { isCompiledBinary } from "../../lib/runtime.js";
 
 // Get the directory containing node executable
 const NODE_BIN_DIR = dirname(process.execPath);

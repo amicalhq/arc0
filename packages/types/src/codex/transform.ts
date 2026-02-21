@@ -1,197 +1,82 @@
 import type {
-  CodexContentBlock,
-  CodexRequestLine,
-  CodexResponseLine,
-  CodexJsonlLine,
+  CodexMessageContentBlock,
+  CodexResponseItemFunctionCall,
+  CodexResponseItemFunctionCallOutput,
+  CodexResponseItemMessage,
+  CodexResponseItemPayload,
 } from "./jsonl";
-import type { ContentBlock, MessageRole } from "../index";
-import type {
-  MessageInsert,
-  ToolCallInsert,
-  TokenUsageInsert,
-  RateLimitInsert,
-} from "../entities";
+import type { ContentBlock } from "../content-blocks";
 
-/**
- * Transform a Codex content block to unified format
- */
-export function transformCodexContentBlock(
-  block: CodexContentBlock
-): ContentBlock {
-  switch (block.type) {
-    case "text":
-      return { type: "text", text: block.text };
-
-    case "function_call":
-      return {
-        type: "tool_use",
-        id: block.id,
-        name: block.name,
-        input: JSON.parse(block.arguments),
-      };
-
-    case "function_result":
-      return {
-        type: "tool_result",
-        tool_use_id: block.call_id,
-        content: block.output,
-        is_error: false,
-      };
+function safeParseJsonObject(value: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Fall through to empty object.
   }
+  return {};
 }
 
-/**
- * Transform Codex message content to unified ContentBlock array
- */
-export function transformCodexContent(
-  content: CodexContentBlock[] | string
+export function transformCodexMessageContent(
+  content: CodexResponseItemMessage["content"],
 ): ContentBlock[] {
   if (typeof content === "string") {
     return [{ type: "text", text: content }];
   }
-  return content.map(transformCodexContentBlock);
+
+  const blocks = content as CodexMessageContentBlock[];
+  return blocks
+    .map((block): ContentBlock | null => {
+      if (block.type === "input_text" || block.type === "output_text") {
+        return { type: "text", text: block.text };
+      }
+      return null;
+    })
+    .filter((b): b is ContentBlock => b !== null);
 }
 
-/**
- * Determine unified message role from Codex JSONL line
- */
-export function determineMessageRole(line: CodexJsonlLine): MessageRole {
-  if (line.type === "info") {
-    return "system";
-  }
-
-  const message = line.type === "request" ? line.message : line.message;
-  if (message.role === "tool") {
-    return "tool";
-  }
-  return message.role as MessageRole;
-}
-
-/**
- * Transform a Codex JSONL request/response line to a unified message
- */
-export function transformCodexMessage(
-  line: CodexRequestLine | CodexResponseLine,
-  sessionId: string
-): MessageInsert {
-  const content = transformCodexContent(line.message.content);
-  const role = determineMessageRole(line);
-
+export function transformCodexFunctionCallToToolUse(
+  payload: CodexResponseItemFunctionCall,
+): ContentBlock {
   return {
-    id: line.id,
-    sessionId,
-    parentMessageId: null,
-    role,
-    providerType: line.type,
-    content,
-    rawContent: typeof line.message.content === "string" ? line.message.content : null,
-    model: line.type === "response" ? (line.model ?? null) : null,
-    providerMessageId: line.id,
-    providerRequestId: line.type === "response" ? line.request_id : null,
-    providerMetadata: null,
+    type: "tool_use",
+    id: payload.call_id,
+    name: payload.name,
+    input: safeParseJsonObject(payload.arguments),
+  };
+}
+
+export function transformCodexFunctionCallOutputToToolResult(
+  payload: CodexResponseItemFunctionCallOutput,
+): ContentBlock {
+  return {
+    type: "tool_result",
+    tool_use_id: payload.call_id,
+    content: payload.output,
+    is_error: false,
   };
 }
 
 /**
- * Extract tool calls from a Codex response message
+ * Best-effort payload-to-content mapping.
+ *
+ * This is intentionally small: Arc0's "truth" types are the canonical SocketMessage
+ * types, and Base is responsible for translating Codex JSONL into those.
  */
-export function extractToolCalls(
-  line: CodexResponseLine,
-  sessionId: string
-): ToolCallInsert[] {
-  const content = line.message.content;
-  if (typeof content === "string") {
-    return [];
+export function transformCodexResponseItemPayloadToContent(
+  payload: CodexResponseItemPayload,
+): ContentBlock[] {
+  switch (payload.type) {
+    case "message":
+      return transformCodexMessageContent(payload.content);
+    case "function_call":
+      return [transformCodexFunctionCallToToolUse(payload)];
+    case "function_call_output":
+      return [transformCodexFunctionCallOutputToToolResult(payload)];
+    default:
+      return [];
   }
-
-  return content
-    .filter(
-      (block): block is Extract<CodexContentBlock, { type: "function_call" }> =>
-        block.type === "function_call"
-    )
-    .map((block) => ({
-      id: block.id,
-      sessionId,
-      messageId: line.id,
-      resultMessageId: null,
-      name: block.name,
-      displayName: null,
-      description: null,
-      input: JSON.parse(block.arguments),
-      inputRaw: block.arguments, // Store raw JSON string
-      output: null,
-      resultDisplay: null,
-      renderOutputAsMarkdown: null,
-      status: "pending" as const,
-      errorMessage: null,
-      completedAt: null,
-      durationMs: null,
-      fileEditMetadata: null,
-    }));
 }
 
-/**
- * Extract token usage from a Codex response message
- */
-export function extractTokenUsage(
-  line: CodexResponseLine,
-  sessionId: string
-): TokenUsageInsert | null {
-  const usage = line.usage;
-  if (!usage) {
-    return null;
-  }
-
-  return {
-    id: `${line.id}-usage`,
-    messageId: line.id,
-    sessionId,
-    model: line.model ?? "unknown",
-    inputTokens: usage.prompt_tokens,
-    outputTokens: usage.completion_tokens,
-    totalTokens: usage.total_tokens,
-    cacheReadTokens: null,
-    cacheWriteTokens: null,
-    thinkingTokens: null,
-    toolTokens: null,
-  };
-}
-
-/**
- * Extract rate limits from a Codex response message
- */
-export function extractRateLimits(
-  line: CodexResponseLine,
-  sessionId: string
-): RateLimitInsert[] {
-  const rateLimit = line.rate_limit;
-  if (!rateLimit) {
-    return [];
-  }
-
-  const limits: RateLimitInsert[] = [];
-
-  if (rateLimit.primary) {
-    limits.push({
-      id: `${line.id}-ratelimit-primary`,
-      sessionId,
-      windowType: "primary",
-      limit: rateLimit.primary.limit,
-      remaining: rateLimit.primary.remaining,
-      resetAt: new Date(rateLimit.primary.reset_at),
-    });
-  }
-
-  if (rateLimit.secondary) {
-    limits.push({
-      id: `${line.id}-ratelimit-secondary`,
-      sessionId,
-      windowType: "secondary",
-      limit: rateLimit.secondary.limit,
-      remaining: rateLimit.secondary.remaining,
-      resetAt: new Date(rateLimit.secondary.reset_at),
-    });
-  }
-
-  return limits;
-}

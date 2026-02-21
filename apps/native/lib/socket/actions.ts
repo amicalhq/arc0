@@ -11,14 +11,13 @@ import type {
   ActionResult,
   ApproveToolUsePayload,
   EncryptedEnvelope,
-  ModelId,
   OpenSessionPayload,
-  PromptMode,
   ProviderId,
   SendPromptPayload,
   StopAgentPayload,
   ToolResponse,
 } from '@arc0/types';
+import type { ModelId, PromptMode } from '@/lib/types/prompt';
 import { getSocketManager, type AppSocket } from './manager';
 import { logEvent, type EventType } from './eventLogger';
 import { encryptPayload, type EncryptionContext } from './encryption';
@@ -200,8 +199,8 @@ export function sendPrompt(
   params: {
     sessionId: string;
     text: string;
-    model: ModelId;
-    mode: PromptMode;
+    model?: ModelId;
+    mode?: PromptMode;
     lastMessageId?: string;
     lastMessageTs?: number;
   }
@@ -210,7 +209,8 @@ export function sendPrompt(
 
   const payload: SendPromptPayload = {
     ...createBasePayload(),
-    ...params,
+    sessionId: params.sessionId,
+    text: params.text,
   };
 
   return emitWithAck(socketInfo, 'sendPrompt', payload);
@@ -233,7 +233,7 @@ export function stopAgent(
 
   const payload: StopAgentPayload = {
     ...createBasePayload(),
-    ...params,
+    sessionId: params.sessionId,
   };
 
   return emitWithAck(socketInfo, 'stopAgent', payload);
@@ -264,7 +264,10 @@ export function approveToolUse(
 
   const payload: ApproveToolUsePayload = {
     ...createBasePayload(),
-    ...params,
+    sessionId: params.sessionId,
+    toolUseId: params.toolUseId,
+    toolName: params.toolName,
+    response: params.response,
   };
 
   return emitWithAck(socketInfo, 'approveToolUse', payload);

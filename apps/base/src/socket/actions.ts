@@ -1,5 +1,5 @@
 /**
- * Action handlers for user actions from mobile app.
+ * Action handlers for user actions from mobile clients (socket layer).
  * Routes actions to the appropriate tmux pane via TTY lookup.
  */
 
@@ -10,13 +10,17 @@ import type {
   StopAgentPayload,
   OpenSessionPayload,
 } from "@arc0/types";
-import type { SessionFile } from "../shared/types.js";
-import { findPaneByTty, sendToPane, sendKeyToPane } from "../shared/tmux.js";
+import type { SessionFile } from "../lib/types.js";
+import { findPaneByTty, sendToPane, sendKeyToPane } from "../lib/tmux.js";
 import { launchSession } from "./session-launcher.js";
 
 // =============================================================================
 // Action Handler
 // =============================================================================
+
+const LOG_TEXT_PREVIEW_CHARS = 50;
+// Claude plan approval "Feedback" is a follow-up prompt; give the UI/prompt handler a beat.
+const PLAN_FEEDBACK_SEND_DELAY_MS = 100;
 
 export interface ActionHandlerDeps {
   getSession: (sessionId: string) => SessionFile | undefined;
@@ -75,7 +79,7 @@ export function createActionHandlers(deps: ActionHandlerDeps) {
      */
     async sendPrompt(payload: SendPromptPayload): Promise<ActionResult> {
       console.log(
-        `[actions] sendPrompt: session=${payload.sessionId} text="${payload.text.slice(0, 50)}..."`,
+        `[actions] sendPrompt: session=${payload.sessionId} text="${payload.text.slice(0, LOG_TEXT_PREVIEW_CHARS)}..."`,
       );
 
       const result = await findPaneForSession(payload.sessionId);
@@ -142,7 +146,9 @@ export function createActionHandlers(deps: ActionHandlerDeps) {
           }
           // If option is 4 (feedback), send the feedback text after
           if (payload.response.option === 4 && payload.response.text) {
-            await new Promise((resolve) => setTimeout(resolve, 100));
+            await new Promise((resolve) =>
+              setTimeout(resolve, PLAN_FEEDBACK_SEND_DELAY_MS),
+            );
             await sendToPane(result.target, payload.response.text, true);
           }
           break;

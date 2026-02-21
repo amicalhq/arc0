@@ -8,23 +8,23 @@ import {
   loadConfig,
   saveConfig,
   type Arc0Config,
-} from "../../shared/config.js";
+} from "../../lib/config.js";
 import {
   loadCredentials,
   ensureCredentials,
   updateTunnelAuth,
   clearTunnelAuth,
   generateSecret,
-} from "../../shared/credentials.js";
-import { readDaemonState } from "../../shared/pid.js";
-import { isDaemonLocked } from "../../shared/lock.js";
+} from "../../lib/credentials.js";
+import { readDaemonState } from "../../lib/pid.js";
+import { isDaemonLocked } from "../../lib/lock.js";
 import {
   ensureFrpc,
   frpcExists,
   generateRandomSubdomain,
   generateFrpcConfig,
-} from "../../shared/frpc.js";
-import { performDeviceAuth, validateToken } from "../../shared/device-auth.js";
+} from "../../lib/frpc.js";
+import { performDeviceAuth, validateToken } from "../../lib/device-auth.js";
 
 const AUTH_HELP = `
 ${pc.bold("arc0 auth")} - Manage authentication
@@ -287,7 +287,7 @@ async function regenerateSubcommand(): Promise<void> {
     ? { ...existing, secret: generateSecret() }
     : ensureCredentials();
 
-  const { CREDENTIALS_FILE } = await import("../../shared/config.js");
+  const { CREDENTIALS_FILE } = await import("../../lib/config.js");
   writeFileSync(CREDENTIALS_FILE, JSON.stringify(newCredentials, null, 2), {
     mode: 0o600,
   });

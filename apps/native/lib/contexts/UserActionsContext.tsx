@@ -7,7 +7,8 @@
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useTable } from 'tinybase/ui-react';
-import type { ActionResult, ModelId, PromptMode, ProviderId, ToolResponse } from '@arc0/types';
+import type { ActionResult, ProviderId, ToolResponse } from '@arc0/types';
+import type { ModelId, PromptMode } from '@/lib/types/prompt';
 import * as socketActions from '@/lib/socket/actions';
 
 // =============================================================================

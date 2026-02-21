@@ -8,10 +8,10 @@
 // =============================================================================
 
 import type {
-  RawMessageEnvelope,
-  SocketSessionData,
+  SocketSession,
   SessionsSyncPayload,
-  RawMessagesBatchPayload,
+  TimelineBatchPayload,
+  TimelineItem,
   SessionCursor,
   InitPayload,
   ProviderId,
@@ -23,10 +23,10 @@ import type {
   ApproveToolUsePayload,
 } from "@arc0/types";
 export type {
-  RawMessageEnvelope,
-  SocketSessionData,
+  SocketSession,
   SessionsSyncPayload,
-  RawMessagesBatchPayload as MessagesBatchPayload,
+  TimelineBatchPayload as MessagesBatchPayload,
+  TimelineItem,
   SessionCursor,
   InitPayload,
   // User action types

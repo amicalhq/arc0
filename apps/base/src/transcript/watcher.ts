@@ -4,7 +4,7 @@
  */
 
 import { watch, type FSWatcher } from "chokidar";
-import { eventBus } from "../../shared/events.js";
+import { eventBus } from "../lib/events.js";
 import { readJsonlFile, readJsonlFileFrom } from "./reader.js";
 import { jsonlStore, type StoredLine } from "./store.js";
 

@@ -1,102 +1,178 @@
 import { z } from "zod";
 
-// Codex raw content block schemas (JSONL format)
+/**
+ * Codex session JSONL line format (Codex CLI / Codex Desktop).
+ *
+ * Observed shape:
+ * { "timestamp": "...", "type": "...", "payload": { ... } }
+ *
+ * This file intentionally does NOT try to over-validate Codex's rapidly evolving
+ * payload schemas. We lock only the fields we need for Arc0 integration.
+ */
 
-export const codexTextBlockSchema = z.object({
-  type: z.literal("text"),
-  text: z.string(),
-});
+// =============================================================================
+// response_item payloads (messages + tool calls/results)
+// =============================================================================
 
-export const codexToolCallBlockSchema = z.object({
-  type: z.literal("function_call"),
-  id: z.string(),
-  name: z.string(),
-  arguments: z.string(), // JSON string
-});
+export const codexMessageContentBlockSchema = z
+  .union([
+    z
+      .object({
+        type: z.literal("input_text"),
+        text: z.string(),
+      })
+      .passthrough(),
+    z
+      .object({
+        type: z.literal("output_text"),
+        text: z.string(),
+      })
+      .passthrough(),
+  ])
+  // Fallback for unknown content blocks (keep forward compatible).
+  .or(z.object({ type: z.string() }).passthrough());
 
-export const codexToolResultBlockSchema = z.object({
-  type: z.literal("function_result"),
-  call_id: z.string(),
-  output: z.string(),
-});
+export type CodexMessageContentBlock = z.infer<
+  typeof codexMessageContentBlockSchema
+>;
 
-export const codexContentBlockSchema = z.union([
-  codexTextBlockSchema,
-  codexToolCallBlockSchema,
-  codexToolResultBlockSchema,
+export const codexResponseItemMessageSchema = z
+  .object({
+    type: z.literal("message"),
+    role: z.string(),
+    content: z.union([z.string(), z.array(codexMessageContentBlockSchema)]),
+  })
+  .passthrough();
+
+export type CodexResponseItemMessage = z.infer<
+  typeof codexResponseItemMessageSchema
+>;
+
+export const codexResponseItemFunctionCallSchema = z
+  .object({
+    type: z.literal("function_call"),
+    name: z.string(),
+    arguments: z.string(), // JSON string
+    call_id: z.string(),
+  })
+  .passthrough();
+
+export type CodexResponseItemFunctionCall = z.infer<
+  typeof codexResponseItemFunctionCallSchema
+>;
+
+export const codexResponseItemFunctionCallOutputSchema = z
+  .object({
+    type: z.literal("function_call_output"),
+    call_id: z.string(),
+    output: z.string(),
+  })
+  .passthrough();
+
+export type CodexResponseItemFunctionCallOutput = z.infer<
+  typeof codexResponseItemFunctionCallOutputSchema
+>;
+
+export const codexResponseItemPayloadSchema = z.union([
+  codexResponseItemMessageSchema,
+  codexResponseItemFunctionCallSchema,
+  codexResponseItemFunctionCallOutputSchema,
+  // Unknown response_item payloads (reasoning, web_search_call, etc.)
+  z.object({ type: z.string() }).passthrough(),
 ]);
 
-export type CodexContentBlock = z.infer<typeof codexContentBlockSchema>;
+export type CodexResponseItemPayload = z.infer<
+  typeof codexResponseItemPayloadSchema
+>;
 
-// Codex message schema
-export const codexMessageSchema = z.object({
-  role: z.enum(["user", "assistant", "system", "tool"]),
-  content: z.union([z.string(), z.array(codexContentBlockSchema)]),
-});
+// =============================================================================
+// event_msg payloads (user message, token counts, reasoning)
+// =============================================================================
 
-export type CodexMessage = z.infer<typeof codexMessageSchema>;
-
-// Codex rate limit info
-export const codexRateLimitSchema = z.object({
-  primary: z
+export const codexEventMsgPayloadSchema = z.union([
+  z
     .object({
-      limit: z.number(),
-      remaining: z.number(),
-      reset_at: z.string(),
+      type: z.literal("user_message"),
+      message: z.string(),
     })
-    .optional(),
-  secondary: z
+    .passthrough(),
+  z
     .object({
-      limit: z.number(),
-      remaining: z.number(),
-      reset_at: z.string(),
+      type: z.literal("agent_reasoning"),
+      text: z.string(),
     })
-    .optional(),
-});
-
-export type CodexRateLimit = z.infer<typeof codexRateLimitSchema>;
-
-// Codex JSONL line types
-export const codexRequestLineSchema = z.object({
-  type: z.literal("request"),
-  id: z.string(),
-  timestamp: z.string(),
-  message: codexMessageSchema,
-});
-
-export const codexResponseLineSchema = z.object({
-  type: z.literal("response"),
-  id: z.string(),
-  request_id: z.string(),
-  timestamp: z.string(),
-  message: codexMessageSchema,
-  model: z.string().optional(),
-  usage: z
+    .passthrough(),
+  z
     .object({
-      prompt_tokens: z.number(),
-      completion_tokens: z.number(),
-      total_tokens: z.number(),
+      type: z.literal("token_count"),
+      info: z.unknown(),
+      rate_limits: z.unknown(),
     })
-    .optional(),
-  rate_limit: codexRateLimitSchema.optional(),
-});
+    .passthrough(),
+  z.object({ type: z.string() }).passthrough(),
+]);
 
-export const codexInfoLineSchema = z.object({
-  type: z.literal("info"),
-  id: z.string(),
+export type CodexEventMsgPayload = z.infer<typeof codexEventMsgPayloadSchema>;
+
+// =============================================================================
+// Top-level JSONL line schemas
+// =============================================================================
+
+export const codexSessionMetaLineSchema = z.object({
   timestamp: z.string(),
-  content: z.string(),
-  level: z.enum(["info", "warning", "error"]).optional(),
+  type: z.literal("session_meta"),
+  payload: z
+    .object({
+      id: z.string(),
+      cwd: z.string().optional(),
+      cli_version: z.string().optional(),
+      model_provider: z.string().optional(),
+    })
+    .passthrough(),
 });
 
-// Union of all JSONL line types
+export type CodexSessionMetaLine = z.infer<typeof codexSessionMetaLineSchema>;
+
+export const codexResponseItemLineSchema = z.object({
+  timestamp: z.string(),
+  type: z.literal("response_item"),
+  payload: codexResponseItemPayloadSchema,
+});
+
+export type CodexResponseItemLine = z.infer<
+  typeof codexResponseItemLineSchema
+>;
+
+export const codexEventMsgLineSchema = z.object({
+  timestamp: z.string(),
+  type: z.literal("event_msg"),
+  payload: codexEventMsgPayloadSchema,
+});
+
+export type CodexEventMsgLine = z.infer<typeof codexEventMsgLineSchema>;
+
+export const codexTurnContextLineSchema = z.object({
+  timestamp: z.string(),
+  type: z.literal("turn_context"),
+  payload: z.unknown(),
+});
+
+export type CodexTurnContextLine = z.infer<typeof codexTurnContextLineSchema>;
+
+export const codexCompactedLineSchema = z.object({
+  timestamp: z.string(),
+  type: z.literal("compacted"),
+  payload: z.unknown(),
+});
+
+export type CodexCompactedLine = z.infer<typeof codexCompactedLineSchema>;
+
 export const codexJsonlLineSchema = z.discriminatedUnion("type", [
-  codexRequestLineSchema,
-  codexResponseLineSchema,
-  codexInfoLineSchema,
+  codexSessionMetaLineSchema,
+  codexResponseItemLineSchema,
+  codexEventMsgLineSchema,
+  codexTurnContextLineSchema,
+  codexCompactedLineSchema,
 ]);
 
 export type CodexJsonlLine = z.infer<typeof codexJsonlLineSchema>;
-export type CodexRequestLine = z.infer<typeof codexRequestLineSchema>;
-export type CodexResponseLine = z.infer<typeof codexResponseLineSchema>;
-export type CodexInfoLine = z.infer<typeof codexInfoLineSchema>;

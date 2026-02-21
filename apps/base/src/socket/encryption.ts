@@ -1,5 +1,5 @@
 /**
- * Server-side encryption layer for Socket.IO.
+ * Server-side encryption layer for Socket.IO (socket layer).
  *
  * Handles encryption/decryption of messages for each connected client.
  */

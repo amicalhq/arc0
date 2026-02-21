@@ -3,11 +3,7 @@ import { Platform } from 'react-native';
 import { useIndexes, useRow, useStore } from 'tinybase/ui-react';
 
 import { loadSessionArtifacts, areArtifactsLoaded } from '@/lib/store/artifacts-loader';
-import {
-  parseTodosContent,
-  parsePlanContent,
-  type TodoItem,
-} from '@/lib/socket/artifact-extractor';
+import { parseTodosContent, parsePlanContent, type TodoItem } from '@/lib/artifacts';
 
 export interface ExtractedPlan {
   content: string | null;

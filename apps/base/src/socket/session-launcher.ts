@@ -1,6 +1,6 @@
 /**
  * Session launcher for mobile-initiated sessions.
- * Creates tmux windows and runs provider CLIs.
+ * Creates tmux windows and runs provider CLIs (socket action: openSession).
  */
 
 import type { ActionResult, OpenSessionPayload, ProviderId } from "@arc0/types";
@@ -12,7 +12,7 @@ import {
   ensureArc0Session,
   createWindow,
   runInPane,
-} from "../shared/tmux.js";
+} from "../lib/tmux.js";
 
 const execAsync = promisify(exec);
 

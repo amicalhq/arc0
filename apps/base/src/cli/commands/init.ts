@@ -8,8 +8,8 @@ import {
   DEFAULT_CONFIG,
   TUNNEL_DOMAIN,
   type Arc0Config,
-} from "../../shared/config.js";
-import { ensureCredentials } from "../../shared/credentials.js";
+} from "../../lib/config.js";
+import { ensureCredentials } from "../../lib/credentials.js";
 import { setupTunnelDuringInit } from "./tunnel.js";
 
 export async function initCommand(): Promise<void> {

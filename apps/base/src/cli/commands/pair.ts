@@ -8,9 +8,9 @@
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import QRCode from "qrcode";
-import { isDaemonLocked } from "../../shared/lock.js";
-import { readDaemonState } from "../../shared/pid.js";
-import { TUNNEL_DOMAIN, loadConfig } from "../../shared/config.js";
+import { isDaemonLocked } from "../../lib/lock.js";
+import { readDaemonState } from "../../lib/pid.js";
+import { TUNNEL_DOMAIN, loadConfig } from "../../lib/config.js";
 
 interface PairingStartResponse {
   formattedCode: string;

@@ -7,19 +7,8 @@ import { z } from "zod";
 import { providerIdSchema } from "./enums";
 
 // =============================================================================
-// Enums
+// Enums (wire-level)
 // =============================================================================
-
-export const modelIdSchema = z.enum([
-  "default",
-  "opus-4.5",
-  "sonnet-4.5",
-  "haiku-4.5",
-]);
-export type ModelId = z.infer<typeof modelIdSchema>;
-
-export const promptModeSchema = z.enum(["default", "bypass", "ask", "plan"]);
-export type PromptMode = z.infer<typeof promptModeSchema>;
 
 /**
  * Plan approval options (matching Claude CLI):
@@ -129,11 +118,6 @@ export type OpenSessionPayload = z.infer<typeof openSessionPayloadSchema>;
 export const sendPromptPayloadSchema = baseActionPayloadSchema.extend({
   sessionId: z.string(),
   text: z.string(),
-  model: modelIdSchema,
-  mode: promptModeSchema,
-  lastMessageId: z.string().optional(),
-  lastMessageTs: z.number().optional(),
-  // TODO: attachments
 });
 export type SendPromptPayload = z.infer<typeof sendPromptPayloadSchema>;
 
@@ -142,8 +126,6 @@ export type SendPromptPayload = z.infer<typeof sendPromptPayloadSchema>;
  */
 export const stopAgentPayloadSchema = baseActionPayloadSchema.extend({
   sessionId: z.string(),
-  lastMessageId: z.string().optional(),
-  lastMessageTs: z.number().optional(),
 });
 export type StopAgentPayload = z.infer<typeof stopAgentPayloadSchema>;
 
@@ -156,8 +138,6 @@ export const approveToolUsePayloadSchema = baseActionPayloadSchema.extend({
   toolUseId: z.string(),
   toolName: z.string(),
   response: toolResponseSchema,
-  lastMessageId: z.string().optional(),
-  lastMessageTs: z.number().optional(),
 });
 export type ApproveToolUsePayload = z.infer<typeof approveToolUsePayloadSchema>;
 

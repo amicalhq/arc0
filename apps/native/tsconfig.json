@@ -18,6 +18,7 @@
   ],
   "exclude": [
     "e2e",
+    "playwright",
     "wdio.conf.ts"
   ]
 }

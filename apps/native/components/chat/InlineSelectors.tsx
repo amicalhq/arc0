@@ -4,7 +4,7 @@
  */
 
 import { View } from 'react-native';
-import type { ModelId, PromptMode } from '@arc0/types';
+import type { ModelId, PromptMode } from '@/lib/types/prompt';
 import { ToolSelect } from './ToolSelect';
 
 // =============================================================================

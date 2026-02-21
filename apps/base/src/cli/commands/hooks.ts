@@ -14,7 +14,7 @@ import {
   CLAUDE_SETTINGS_FILE,
   loadConfig,
   type Arc0Config,
-} from "../../shared/config.js";
+} from "../../lib/config.js";
 import { CLAUDE_SESSION_SCRIPT } from "../hooks/claude-session.embedded.js";
 
 const CLAUDE_HOOK_DEST = join(HOOKS_DIR, "claude-session.js");

@@ -5,6 +5,7 @@
 import type { ProviderId } from "./enums";
 import type { ContentBlock } from "./content-blocks";
 import type { SessionEvent } from "./session";
+import type { Arc0ProtocolVersion } from "./protocol";
 import type {
   ActionResult,
   ApproveToolUsePayload,
@@ -33,6 +34,21 @@ export interface SocketAuth {
   deviceId: string;
   /** Auth token derived from SPAKE2 pairing */
   authToken: string;
+}
+
+// =============================================================================
+// Protocol / Versioning
+// =============================================================================
+
+/**
+ * Base -> Client: protocol error.
+ * Sent unencrypted because it may be emitted before encryption is negotiated.
+ */
+export interface ProtocolErrorPayload {
+  code: "PROTOCOL_MISMATCH";
+  expected: number;
+  received: number;
+  message: string;
 }
 
 // =============================================================================
@@ -103,10 +119,35 @@ export interface PairErrorPayload {
 // =============================================================================
 
 /**
- * Session data sent over socket.
- * Simplified version of Session entity for transport.
+ * Session capabilities advertised by Base.
+ * Keeps UI logic provider-agnostic via feature-gating.
  */
-export interface SocketSessionData {
+export interface SessionCapabilities {
+  modelSwitch:
+    | { supported: false }
+    | {
+        supported: true;
+        kind: "command";
+        commandName: "/model";
+        /**
+         * Optional UI choices for known providers.
+         * If absent, UI can fall back to a free-form input for the command.
+         */
+        options?: Array<{ id: string; label: string; command: string }>;
+      };
+
+  approvals: {
+    /**
+     * Whether Base will emit `permission_request` session events for this provider.
+     */
+    supported: boolean;
+  };
+}
+
+/**
+ * Session data sent over socket (transport form).
+ */
+export interface SocketSession {
   id: string;
   provider: ProviderId;
   cwd: string; // Working directory path, mobile generates hash ID for project
@@ -114,7 +155,8 @@ export interface SocketSessionData {
   model: string | null;
   gitBranch: string | null;
   startedAt: string; // ISO string for transport
-  interactive?: boolean; // true if session is running in tmux (can receive input)
+  interactive: boolean; // true if session can receive input (tmux-backed)
+  capabilities: SessionCapabilities;
 }
 
 /**
@@ -126,20 +168,49 @@ export interface SocketProjectData {
 }
 
 /**
- * Message sent over socket.
- * Simplified version of Message entity for transport.
+ * Canonical messages sent over socket.
  */
-export interface SocketMessage {
+export interface SocketBaseMessage {
   uuid: string;
   sessionId: string;
-  parentUuid?: string;
-  type: "user" | "assistant" | "system";
+  parentUuid: string | null;
   timestamp: string; // ISO string for transport
-  cwd?: string;
   content: ContentBlock[];
+}
+
+export interface SocketUserMessage extends SocketBaseMessage {
+  type: "user";
+}
+
+export interface SocketAssistantMessage extends SocketBaseMessage {
+  type: "assistant";
   stopReason?: "end_turn" | "tool_use" | null;
   usage?: { inputTokens: number; outputTokens: number };
+  model?: string | null;
 }
+
+export type SystemMessageSubtype =
+  | "local_command"
+  | "api_error"
+  | "compact_boundary"
+  | "stop_hook_summary"
+  | "turn_duration";
+
+export interface SocketSystemMessage extends SocketBaseMessage {
+  type: "system";
+  subtype?: SystemMessageSubtype;
+
+  // Local command (Claude) support: Base must parse provider blobs and populate these.
+  commandName?: string; // e.g. "/model"
+  commandArgs?: string; // raw args string if available
+  stdout?: string;
+  stderr?: string;
+}
+
+export type SocketMessage =
+  | SocketUserMessage
+  | SocketAssistantMessage
+  | SocketSystemMessage;
 
 /**
  * Session cursor - tracks last known message position.
@@ -161,6 +232,7 @@ export interface SessionCursor {
 export interface InitPayload {
   deviceId: string;
   cursor: SessionCursor[];
+  protocolVersion: Arc0ProtocolVersion | number;
 }
 
 /**
@@ -168,7 +240,7 @@ export interface InitPayload {
  */
 export interface SessionsSyncPayload {
   workstationId: string;
-  sessions: SocketSessionData[];
+  sessions: SocketSession[];
 }
 
 /**
@@ -181,21 +253,20 @@ export interface ProjectsSyncPayload {
 
 /**
  * Payload for messages event (Base -> App).
+ * Canonical timeline batch (messages + session events).
  */
-export interface MessagesBatchPayload {
+export interface TimelineBatchPayload {
   workstationId: string;
-  messages: SocketMessage[];
   batchId: string;
+  items: TimelineItem[];
 }
 
 /**
- * Payload for permissionRequest event (Base -> App).
+ * Timeline item (message or session event).
  */
-export interface PermissionRequestPayload {
-  workstationId: string;
-  sessionId: string;
-  event: SessionEvent;
-}
+export type TimelineItem =
+  | { kind: "message"; message: SocketMessage }
+  | { kind: "session_event"; sessionId: string; event: SessionEvent };
 
 // =============================================================================
 // Socket.IO Event Maps
@@ -226,8 +297,8 @@ export interface ServerToClient extends PairingServerToClient {
   sessions: (payload: EncryptedEnvelope) => void;
   projects: (payload: EncryptedEnvelope) => void;
   messages: (payload: EncryptedEnvelope, ack: () => void) => void;
-  // Note: Permission requests are sent through the "messages" channel
-  // with payload.type === 'permission_request'
+  // Unencrypted errors
+  "protocol:error": (payload: ProtocolErrorPayload) => void;
 }
 
 /**
@@ -256,24 +327,4 @@ export interface ClientToServer extends PairingClientToServer {
 }
 
 // =============================================================================
-// Raw Message Envelope (JSONL passthrough from Base to App)
-// =============================================================================
-
-/**
- * Raw JSONL line wrapped with session context.
- * Base sends raw JSONL lines without transformation.
- * App handles parsing, filtering, and transformation.
- */
-export interface RawMessageEnvelope {
-  sessionId: string;
-  payload: unknown; // Raw JSONL line (ClaudeJsonlLine from claude/jsonl.ts)
-}
-
-/**
- * Payload for messages event using raw envelopes.
- */
-export interface RawMessagesBatchPayload {
-  workstationId: string;
-  messages: RawMessageEnvelope[];
-  batchId: string;
-}
+// No raw passthrough types here: Base must ship canonical timeline only.

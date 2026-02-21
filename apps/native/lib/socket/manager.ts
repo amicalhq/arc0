@@ -9,6 +9,7 @@
 
 import { io, Socket } from 'socket.io-client';
 import { logEvent } from './eventLogger';
+import { ARC0_PROTOCOL_VERSION } from '@arc0/types';
 import {
   encryptPayload,
   decryptPayload,
@@ -21,7 +22,8 @@ import type {
   ConnectionState,
   EncryptedEnvelope,
   InitPayload,
-  RawMessagesBatchPayload,
+  TimelineBatchPayload,
+  ProtocolErrorPayload,
   ServerToClientEvents,
   SessionCursor,
   SessionsSyncPayload,
@@ -53,7 +55,7 @@ export interface WorkstationConnection {
 
 export interface SocketManagerHandlers {
   onSessionsSync: (payload: SessionsSyncPayload) => Promise<void>;
-  onMessagesBatch: (payload: RawMessagesBatchPayload) => Promise<void>;
+  onMessagesBatch: (payload: TimelineBatchPayload) => Promise<void>;
   getDeviceId: () => string;
   getSessionCursors: (workstationId: string) => SessionCursor[];
 }
@@ -353,7 +355,11 @@ export class SocketManager {
       if (this.handlers) {
         const deviceId = this.handlers.getDeviceId();
         const cursor = this.handlers.getSessionCursors(workstationId);
-        const initPayload: InitPayload = { deviceId, cursor };
+        const initPayload: InitPayload = {
+          deviceId,
+          cursor,
+          protocolVersion: ARC0_PROTOCOL_VERSION,
+        };
         socket.emit('init', initPayload);
         console.log(
           `[SocketManager] ${workstationId} sent init: device=${deviceId} cursors=${cursor.length}`
@@ -378,6 +384,15 @@ export class SocketManager {
         status: 'error',
         error: error.message,
       });
+    });
+
+    socket.on('protocol:error', (payload: ProtocolErrorPayload) => {
+      const message = payload?.message || 'Protocol mismatch - update Base and the client';
+      console.warn(`[SocketManager] ${workstationId} protocol error: ${message}`, payload);
+      logEvent('error', 'system', `${workstationId} protocol error: ${message}`, payload);
+      this.updateConnectionState(workstationId, { status: 'error', error: message });
+      // Disconnect to prevent processing of incompatible payload shapes.
+      socket.disconnect();
     });
 
     // Reconnection events
@@ -441,20 +456,18 @@ export class SocketManager {
     socket.on('messages', async (payloadOrEnvelope, callback) => {
       try {
         // Decrypt if encrypted
-        let payload: RawMessagesBatchPayload;
+        let payload: TimelineBatchPayload;
         if (encryptionCtx && isEncryptedEnvelope(payloadOrEnvelope)) {
-          payload = decryptPayload<RawMessagesBatchPayload>(encryptionCtx, payloadOrEnvelope);
+          payload = decryptPayload<TimelineBatchPayload>(encryptionCtx, payloadOrEnvelope);
         } else {
-          payload = payloadOrEnvelope as unknown as RawMessagesBatchPayload;
+          payload = payloadOrEnvelope as unknown as TimelineBatchPayload;
         }
 
-        console.log(
-          `[SocketManager] ${workstationId} received ${payload.messages.length} messages`
-        );
-        logEvent('messages', 'in', `${workstationId}: ${payload.messages.length} messages`, {
+        console.log(`[SocketManager] ${workstationId} received ${payload.items.length} items`);
+        logEvent('messages', 'in', `${workstationId}: ${payload.items.length} items`, {
           batchId: payload.batchId,
           workstationId: payload.workstationId,
-          messageCount: payload.messages.length,
+          itemCount: payload.items.length,
         });
         if (this.handlers) {
           await this.handlers.onMessagesBatch(payload);

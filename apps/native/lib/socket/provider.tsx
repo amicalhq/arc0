@@ -29,7 +29,7 @@ import {
 import { getSocketManager } from './manager';
 import type {
   ConnectionState,
-  RawMessagesBatchPayload,
+  TimelineBatchPayload,
   SessionCursor,
   SessionsSyncPayload,
 } from './types';
@@ -225,7 +225,7 @@ export function SocketProvider({ children, autoConnect = true }: SocketProviderP
   );
 
   const onMessagesBatch = useCallback(
-    async (payload: RawMessagesBatchPayload): Promise<void> => {
+    async (payload: TimelineBatchPayload): Promise<void> => {
       if (!store) {
         console.warn('[SocketProvider] Store not ready, ignoring messages');
         return;

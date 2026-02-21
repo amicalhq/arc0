@@ -3,8 +3,8 @@ import type { SessionEvent } from "@arc0/types";
 import type { SessionFile } from "./types.js";
 
 // Re-export StoredLine from its canonical location
-export type { StoredLine } from "../daemon/jsonl/store.js";
-import type { StoredLine } from "../daemon/jsonl/store.js";
+export type { StoredLine } from "../transcript/store.js";
+import type { StoredLine } from "../transcript/store.js";
 
 /**
  * All event types in one place.

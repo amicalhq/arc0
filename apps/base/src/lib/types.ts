@@ -6,8 +6,8 @@ export type {
   ClientToServer,
   InitPayload,
   SessionsSyncPayload,
-  MessagesBatchPayload,
-  SocketSessionData as SessionData,
+  TimelineBatchPayload,
+  SocketSession as SessionData,
   SocketMessage,
   SessionCursor,
 } from "@arc0/types";
