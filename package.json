@@ -18,5 +18,15 @@
     "@arc0/eslint-config": "workspace:*",
     "@arc0/typescript-config": "workspace:*"
   },
+  "pnpm": {
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "tinybase>expo": "*",
+        "tinybase>expo-sqlite": "*",
+        "tinybase>react": "*",
+        "tinybase>react-dom": "*"
+      }
+    }
+  },
   "packageManager": "pnpm@10.26.2"
 }

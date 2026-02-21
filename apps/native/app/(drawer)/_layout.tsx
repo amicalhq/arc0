@@ -133,9 +133,7 @@ function DrawerContent(
               )}
             </Pressable>
             {!isPersistent && (!isOnIndex || selectedSessionId) && (
-              <Pressable
-                onPress={handleCloseDrawer}
-                className="active:bg-accent rounded-lg p-2">
+              <Pressable onPress={handleCloseDrawer} className="active:bg-accent rounded-lg p-2">
                 <Icon as={XIcon} className="text-muted-foreground size-5" />
               </Pressable>
             )}

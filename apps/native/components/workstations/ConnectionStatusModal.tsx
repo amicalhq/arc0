@@ -36,7 +36,11 @@ const STATUS_CONFIG = {
   },
 } as const;
 
-export function ConnectionStatusModal({ visible, onClose, syncStatus }: ConnectionStatusModalProps) {
+export function ConnectionStatusModal({
+  visible,
+  onClose,
+  syncStatus,
+}: ConnectionStatusModalProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const activeWorkstation = useActiveWorkstation();

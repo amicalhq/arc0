@@ -32,13 +32,7 @@ export function ConnectionStatusView() {
         <FontAwesome6
           name={isConnected ? 'plug-circle-check' : 'plug-circle-xmark'}
           size={28}
-          color={
-            isConnected
-              ? '#22c55e'
-              : isConnecting
-                ? '#f59e0b'
-                : '#ef4444'
-          }
+          color={isConnected ? '#22c55e' : isConnecting ? '#f59e0b' : '#ef4444'}
         />
         <View>
           <Text className="text-foreground text-lg font-semibold">

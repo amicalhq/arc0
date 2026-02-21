@@ -53,9 +53,7 @@ function SelectTrigger({
   // onClick (not onPointerDown) to open the dropdown on touch devices.
   // We use onPress (which always fires from Pressable) to manually open the select.
   const { onOpenChange } = SelectPrimitive.useRootContext();
-  const handlePress = Platform.OS === 'web'
-    ? () => onOpenChange(true)
-    : props.onPress;
+  const handlePress = Platform.OS === 'web' ? () => onOpenChange(true) : props.onPress;
 
   return (
     <SelectPrimitive.Trigger

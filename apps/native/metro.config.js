@@ -7,11 +7,8 @@ const monorepoRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
-// Watch monorepo root for pnpm hoisted packages
-config.watchFolders = [monorepoRoot];
-
-// Enable package exports for proper ESM resolution during SSR
-config.resolver.unstable_enablePackageExports = true;
+// Watch monorepo root for pnpm hoisted packages while keeping Expo defaults.
+config.watchFolders = [...new Set([...(config.watchFolders ?? []), monorepoRoot])];
 
 // Help Metro resolve packages in pnpm monorepo structure
 config.resolver.nodeModulesPaths = [

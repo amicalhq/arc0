@@ -49,7 +49,9 @@ function SessionHeader() {
         </Pressable>
       )}
 
-      <View className="flex-1 justify-center" style={{ height: isWeb ? 36 : 30, overflow: 'hidden' }}>
+      <View
+        className="flex-1 justify-center"
+        style={{ height: isWeb ? 36 : 30, overflow: 'hidden' }}>
         {session ? (
           <SessionInfo session={session} context="header" />
         ) : (

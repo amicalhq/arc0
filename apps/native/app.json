@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "arc0",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -21,8 +20,6 @@
       "bundleIdentifier": "ai.arc0.app",
       "associatedDomains": [
         "applinks:arc0.ai",
-        "applinks:www.arc0.ai",
-        "applinks:arc0.ai",
         "applinks:www.arc0.ai"
       ],
       "appleTeamId": "59CRJ9SJ4N",
@@ -31,7 +28,6 @@
       }
     },
     "android": {
-      "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
