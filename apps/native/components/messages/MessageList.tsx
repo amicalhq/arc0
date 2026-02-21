@@ -7,11 +7,7 @@ import type {
 } from '@/lib/types/session';
 import { useScrollToMessageSafe } from '@/lib/contexts/ScrollToMessageContext';
 import { useMessage } from '@/lib/store/hooks';
-import {
-  deriveToolState,
-  isNonInteractiveTool,
-  type ToolResultWithMetadata,
-} from '@/lib/utils/tool-state';
+import { deriveToolState, type ToolResultWithMetadata } from '@/lib/utils/tool-state';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { View } from 'react-native';
@@ -26,8 +22,8 @@ import { ToolCallBlock } from './ToolCallBlock';
 interface MessageListProps {
   messages: RenderableMessage[];
   providerId?: string;
-  /** Whether the client can send interactive responses (e.g. tmux-backed session). */
-  interactiveEnabled?: boolean;
+  /** The tool_use ID that is currently awaiting user interaction (from pendingTool), or null. */
+  interactiveToolUseId: string | null;
 }
 
 interface ContentBlockRendererProps {
@@ -37,7 +33,7 @@ interface ContentBlockRendererProps {
   isInProgress?: boolean;
   isLastMessage?: boolean;
   providerId?: string;
-  interactiveEnabled?: boolean;
+  interactiveToolUseId: string | null;
 }
 
 function ContentBlockRenderer({
@@ -47,7 +43,7 @@ function ContentBlockRenderer({
   isInProgress,
   isLastMessage,
   providerId,
-  interactiveEnabled,
+  interactiveToolUseId,
 }: ContentBlockRendererProps) {
   switch (block.type) {
     case 'text':
@@ -60,14 +56,10 @@ function ContentBlockRenderer({
       return <ThinkingBlockDisplay thinking={block.thinking} isInProgress={isInProgress} />;
     case 'tool_use': {
       const result = toolResults.get(block.id);
-      // Interactive tools are pending tools in the last message that require user input
-      // - AskUserQuestion, ExitPlanMode: have custom interactive UI
-      // - Other tools (Bash, Read, Write, etc.): show tool permission approval UI
-      // - TodoWrite, EnterPlanMode: NOT interactive (no user input needed)
-      const isPending = !result;
-      const isNonInteractive = isNonInteractiveTool(block.name);
-      const isInteractive =
-        (interactiveEnabled ?? true) && isLastMessage && isPending && !isNonInteractive;
+      // A tool is interactive only when the parent (chat.tsx) has determined it
+      // needs user input — either via explicit daemon permission_request or
+      // because it's an always-interactive tool (AskUserQuestion, ExitPlanMode).
+      const isAwaitingInput = block.id === interactiveToolUseId;
       return (
         <ToolCallBlock
           name={block.name}
@@ -75,7 +67,7 @@ function ContentBlockRenderer({
           result={result?.block.content}
           isError={result?.block.is_error}
           metadata={result?.metadata}
-          interactive={isInteractive}
+          awaitingInput={isAwaitingInput}
           isLastMessage={isLastMessage}
         />
       );
@@ -111,7 +103,7 @@ interface RenderableItemProps {
   toolResults: Map<string, ToolResultWithMetadata>;
   isLastMessage?: boolean;
   providerId?: string;
-  interactiveEnabled?: boolean;
+  interactiveToolUseId: string | null;
 }
 
 /**
@@ -125,7 +117,7 @@ const RenderableItem = React.memo(function RenderableItem({
   toolResults,
   isLastMessage,
   providerId,
-  interactiveEnabled,
+  interactiveToolUseId,
 }: RenderableItemProps) {
   // For TinyBase messages, fetch reactively via useMessage
   // This ensures updates to stdout/stderr trigger re-renders
@@ -178,7 +170,7 @@ const RenderableItem = React.memo(function RenderableItem({
             isInProgress={message.isInProgress}
             isLastMessage={isLastMessage}
             providerId={providerId}
-            interactiveEnabled={interactiveEnabled}
+            interactiveToolUseId={interactiveToolUseId}
           />
         ))}
       </View>
@@ -192,7 +184,7 @@ function ItemSeparator() {
   return <View className="h-2" />;
 }
 
-export function MessageList({ messages, providerId, interactiveEnabled }: MessageListProps) {
+export function MessageList({ messages, providerId, interactiveToolUseId }: MessageListProps) {
   const listRef = useRef<FlashListRef<RenderableMessage>>(null);
   const scrollContext = useScrollToMessageSafe();
 
@@ -282,7 +274,7 @@ export function MessageList({ messages, providerId, interactiveEnabled }: Messag
             toolResults={toolResults}
             isLastMessage={isLast}
             providerId={providerId}
-            interactiveEnabled={interactiveEnabled}
+            interactiveToolUseId={interactiveToolUseId}
           />
         );
       }
@@ -295,14 +287,14 @@ export function MessageList({ messages, providerId, interactiveEnabled }: Messag
             toolResults={toolResults}
             isLastMessage={isLast}
             providerId={providerId}
-            interactiveEnabled={interactiveEnabled}
+            interactiveToolUseId={interactiveToolUseId}
           />
         );
       }
 
       return null;
     },
-    [visibleMessages.length, toolResults, providerId, interactiveEnabled]
+    [visibleMessages.length, toolResults, providerId, interactiveToolUseId]
   );
 
   return (

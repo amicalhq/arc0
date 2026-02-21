@@ -34,7 +34,7 @@ interface ToolCallBlockProps {
   result?: string | unknown[] | Record<string, unknown>;
   isError?: boolean;
   metadata?: ToolUseResultMetadata;
-  interactive?: boolean; // Enable interactive mode for AskUserQuestion
+  awaitingInput?: boolean;
   isLastMessage?: boolean;
 }
 
@@ -267,41 +267,39 @@ export function ToolCallBlock({
   result,
   isError,
   metadata,
-  interactive,
+  awaitingInput,
   isLastMessage,
 }: ToolCallBlockProps) {
   const [isOpen, setIsOpen] = useState(() => {
     // Interactive tools (awaiting approval) should always start expanded
-    if (interactive) return true;
+    if (awaitingInput) return true;
     if (!isLastMessage) return false;
     return shouldAutoExpand(name);
   });
   // Track if user has manually toggled the collapsible - don't override their choice
   const [userInteracted, setUserInteracted] = useState(false);
   // Track previous interactive value to detect state transitions
-  const prevInteractive = useRef(interactive);
+  const prevAwaitingInput = useRef(awaitingInput);
 
-  // React to interactive state transitions (not initial mount):
-  // - When interactive becomes true (tool needs approval) → expand
-  // - When interactive becomes false (tool was approved) → collapse unless in whitelist
+  // React to awaitingInput state transitions (not initial mount):
+  // - When awaitingInput becomes true (tool needs input) → expand
+  // - When awaitingInput becomes false (tool was resolved) → collapse unless in whitelist
   // - Don't override if user has manually interacted
   useEffect(() => {
     if (userInteracted) return;
 
-    if (interactive && !prevInteractive.current) {
-      // Newly became interactive (needs approval)
+    if (awaitingInput && !prevAwaitingInput.current) {
       setIsOpen(true);
     } else if (
-      !interactive &&
-      prevInteractive.current &&
+      !awaitingInput &&
+      prevAwaitingInput.current &&
       isLastMessage &&
       !shouldAutoExpand(name)
     ) {
-      // Was just approved (interactive went from true to false) → collapse
       setIsOpen(false);
     }
-    prevInteractive.current = interactive;
-  }, [interactive, isLastMessage, name, userInteracted]);
+    prevAwaitingInput.current = awaitingInput;
+  }, [awaitingInput, isLastMessage, name, userInteracted]);
 
   // Handle user toggle - track that they've interacted
   const handleOpenChange = (open: boolean) => {
@@ -386,14 +384,14 @@ export function ToolCallBlock({
                     }[]
                   }
                   answer={normalizedResult}
-                  interactive={interactive}
+                  awaitingInput={awaitingInput}
                 />
               ) : name === 'ExitPlanMode' ? (
                 <PlanApprovalDisplay
                   planFilePath={input.planFilePath as string | undefined}
                   planContent={input.plan as string | undefined}
                   answer={normalizedResult}
-                  interactive={interactive}
+                  awaitingInput={awaitingInput}
                 />
               ) : !CUSTOM_DISPLAY_TOOLS.has(name) ? (
                 <ToolApprovalDisplay
@@ -401,7 +399,7 @@ export function ToolCallBlock({
                   input={input}
                   answer={normalizedResult}
                   isError={isError}
-                  interactive={interactive}
+                  awaitingInput={awaitingInput}
                 />
               ) : (
                 <Text className="text-muted-foreground font-mono text-xs leading-relaxed">

@@ -41,7 +41,7 @@ interface PlanApprovalDisplayProps {
   planFilePath?: string;
   planContent?: string; // The actual plan content from input.plan
   answer?: string; // Tool result content if answered
-  interactive?: boolean;
+  awaitingInput?: boolean;
 }
 
 // Parse the approval response from tool_result
@@ -86,7 +86,7 @@ export function PlanApprovalDisplay({
   planFilePath,
   planContent,
   answer,
-  interactive,
+  awaitingInput,
 }: PlanApprovalDisplayProps) {
   const context = usePendingQuestionSafe();
 
@@ -94,17 +94,17 @@ export function PlanApprovalDisplay({
   const existingFeedback = extractFeedback(answer);
   const isPending = !answer;
 
-  // Get selection from context if interactive
+  // Get selection from context if awaiting input
   // We use questionIndex 0 since plan approval is always a single "question"
   const contextSelection = context?.selections.get(0) as string | undefined;
   const hasContextSelection = contextSelection !== undefined;
   const isSubmitting = context?.isSubmitting ?? false;
 
   // Determine the current selected value
-  const selectedValue = interactive && hasContextSelection ? contextSelection : existingResponse;
+  const selectedValue = awaitingInput && hasContextSelection ? contextSelection : existingResponse;
 
   // Disable interactions while submitting
-  const isInteractive = interactive && !isSubmitting;
+  const isInteractive = awaitingInput && !isSubmitting;
 
   const handleOptionPress = (value: string) => {
     if (isInteractive && context) {
@@ -207,7 +207,7 @@ export function PlanApprovalDisplay({
       )}
 
       {/* Awaiting indicator for non-interactive pending state */}
-      {isPending && !interactive && !isSubmitting && (
+      {isPending && !awaitingInput && !isSubmitting && (
         <View className="mt-3 flex-row items-center">
           <View className="bg-primary/20 mr-2 size-2 rounded-full" />
           <Text className="text-muted-foreground text-[10px] italic">Awaiting approval...</Text>

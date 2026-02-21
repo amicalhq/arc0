@@ -625,7 +625,7 @@ function ChatContent({ sessionId }: { sessionId: string }) {
           <MessageList
             messages={messages}
             providerId={session?.providerId}
-            interactiveEnabled={isSessionInteractive}
+            interactiveToolUseId={isSessionInteractive ? (pendingTool?.toolUseId ?? null) : null}
           />
         ) : (
           <Pressable
@@ -641,8 +641,8 @@ function ChatContent({ sessionId }: { sessionId: string }) {
 
       {/* Prompt input */}
       {!isSessionInteractive && (
-        <View className="border-border bg-muted/40 mx-2 mb-2 rounded-sm border px-3 py-2">
-          <Text className="text-muted-foreground text-xs">
+        <View className="border-destructive/50 bg-destructive/10 mx-2 mb-2 rounded-sm border px-3 py-2">
+          <Text className="text-destructive text-xs">
             This session is non-interactive. Use tmux on the workstation to respond to prompts and
             permissions.
           </Text>

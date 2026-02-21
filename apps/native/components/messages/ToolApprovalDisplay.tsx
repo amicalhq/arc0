@@ -37,7 +37,7 @@ interface ToolApprovalDisplayProps {
   input: Record<string, unknown>;
   answer?: string; // Tool result content if answered
   isError?: boolean;
-  interactive?: boolean;
+  awaitingInput?: boolean;
 }
 
 // Get a human-readable description for the tool
@@ -81,7 +81,7 @@ export function ToolApprovalDisplay({
   input,
   answer,
   isError,
-  interactive,
+  awaitingInput,
 }: ToolApprovalDisplayProps) {
   const context = usePendingQuestionSafe();
 
@@ -95,10 +95,10 @@ export function ToolApprovalDisplay({
   const isSubmitting = context?.isSubmitting ?? false;
 
   // Determine the current selected value
-  const selectedValue = interactive && hasContextSelection ? contextSelection : undefined;
+  const selectedValue = awaitingInput && hasContextSelection ? contextSelection : undefined;
 
   // Disable interactions while submitting
-  const isInteractive = interactive && !isSubmitting;
+  const isInteractive = awaitingInput && !isSubmitting;
 
   const description = getToolDescription(toolName, input);
 
@@ -107,6 +107,25 @@ export function ToolApprovalDisplay({
       context.selectOption(0, value);
     }
   };
+
+  // Non-interactive tools that were never part of the approval flow:
+  // just show the description, no "Allow" prompt or status indicators.
+  if (!awaitingInput && isPending) {
+    return (
+      <View>
+        <Text className="text-muted-foreground font-mono text-xs" numberOfLines={2}>
+          {description}
+        </Text>
+        {toolName === 'Bash' && typeof input.command === 'string' && (
+          <View className="bg-muted mt-2 rounded-lg p-2">
+            <Text className="text-foreground font-mono text-xs" numberOfLines={3}>
+              {input.command}
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  }
 
   return (
     <View>
@@ -167,7 +186,7 @@ export function ToolApprovalDisplay({
           })}
         </View>
       ) : (
-        // Non-interactive: show status
+        // Non-interactive: show resolved status
         <View className="flex-row items-center">
           {approvalStatus === 'approved' && (
             <View className="flex-row items-center gap-1.5">
@@ -189,14 +208,6 @@ export function ToolApprovalDisplay({
         <View className="mt-3 flex-row items-center">
           <View className="bg-primary mr-2 size-2 animate-pulse rounded-full" />
           <Text className="text-primary text-[10px] italic">Sending response...</Text>
-        </View>
-      )}
-
-      {/* Awaiting indicator for non-interactive pending state */}
-      {isPending && !interactive && !isSubmitting && (
-        <View className="mt-3 flex-row items-center">
-          <View className="bg-primary/20 mr-2 size-2 rounded-full" />
-          <Text className="text-muted-foreground text-[10px] italic">Awaiting approval...</Text>
         </View>
       )}
     </View>

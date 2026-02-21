@@ -20,7 +20,7 @@ interface Question {
 interface AskUserQuestionDisplayProps {
   questions: Question[];
   answer?: string; // Raw tool_result content
-  interactive?: boolean; // Enable selection mode
+  awaitingInput?: boolean;
   toolUseId?: string; // For tracking which question this is
 }
 
@@ -120,45 +120,45 @@ function SingleSelectQuestion({
   question,
   questionIndex,
   answeredValue,
-  interactive,
+  awaitingInput,
 }: {
   question: Question;
   questionIndex: number;
   answeredValue?: string;
-  interactive?: boolean;
+  awaitingInput?: boolean;
 }) {
   const context = usePendingQuestionSafe();
   const hasCustomAnswer = isCustomAnswer(answeredValue, question.options, false);
   const existingCustomText = hasCustomAnswer ? answeredValue : '';
 
-  // Get selection from context if interactive
+  // Get selection from context if awaiting input
   const contextSelection = context?.selections.get(questionIndex);
   const hasContextSelection = contextSelection !== undefined;
   const isOtherSelected = contextSelection === OTHER_OPTION;
   const isSubmitting = context?.isSubmitting ?? false;
 
   // Disable interactions while submitting
-  const isInteractive = interactive && !isSubmitting;
+  const isEnabled = awaitingInput && !isSubmitting;
 
   return (
     <RadioGroup
-      value={isInteractive && hasContextSelection ? (contextSelection as string) : answeredValue}
+      value={isEnabled && hasContextSelection ? (contextSelection as string) : answeredValue}
       onValueChange={() => {}}
-      disabled={!isInteractive}>
+      disabled={!isEnabled}>
       <View className="gap-1.5">
         {question.options.map((opt, optIndex) => {
-          // Determine if selected: use context selection in interactive mode, otherwise use answeredValue
-          const isSelected = isInteractive
+          // Determine if selected: use context selection when awaiting input, otherwise use answeredValue
+          const isSelected = isEnabled
             ? isContextSelected(opt.label, context?.selections ?? new Map(), questionIndex, false)
             : answeredValue === opt.label;
 
           // Determine if should be dimmed
-          const shouldDim = isInteractive
+          const shouldDim = isEnabled
             ? hasContextSelection && !isSelected
             : answeredValue && !isSelected;
 
           const handlePress = () => {
-            if (isInteractive && context) {
+            if (isEnabled && context) {
               context.selectOption(questionIndex, opt.label);
             }
           };
@@ -189,7 +189,7 @@ function SingleSelectQuestion({
             </View>
           );
 
-          if (isInteractive) {
+          if (isEnabled) {
             return (
               <Pressable key={optIndex} onPress={handlePress}>
                 {content}
@@ -200,8 +200,8 @@ function SingleSelectQuestion({
           return <View key={optIndex}>{content}</View>;
         })}
 
-        {/* Interactive "Other" option */}
-        {isInteractive && (
+        {/* "Other" option (only shown when awaiting input) */}
+        {isEnabled && (
           <Pressable
             onPress={() => {
               if (context) {
@@ -231,8 +231,8 @@ function SingleSelectQuestion({
           </Pressable>
         )}
 
-        {/* Custom "Other" response (only shown for answered non-interactive questions) */}
-        {!interactive && hasCustomAnswer && existingCustomText && (
+        {/* Custom "Other" response (only shown for already-answered questions) */}
+        {!awaitingInput && hasCustomAnswer && existingCustomText && (
           <View className="border-primary bg-primary/10 flex-row items-center rounded-lg border px-3 py-2">
             <RadioGroupItem value={existingCustomText} />
             <View className="ml-2 flex-1">
@@ -251,12 +251,12 @@ function MultiSelectQuestion({
   question,
   questionIndex,
   answeredValue,
-  interactive,
+  awaitingInput,
 }: {
   question: Question;
   questionIndex: number;
   answeredValue?: string;
-  interactive?: boolean;
+  awaitingInput?: boolean;
 }) {
   const context = usePendingQuestionSafe();
   const hasCustomAnswer = isCustomAnswer(answeredValue, question.options, true);
@@ -266,27 +266,27 @@ function MultiSelectQuestion({
   const isSubmitting = context?.isSubmitting ?? false;
 
   // Disable interactions while submitting
-  const isInteractive = interactive && !isSubmitting;
+  const isEnabled = awaitingInput && !isSubmitting;
 
-  // Get selection from context if interactive
+  // Get selection from context if awaiting input
   const contextSelection = context?.selections.get(questionIndex);
   const hasContextSelection = contextSelection !== undefined;
 
   return (
     <View className="gap-1.5">
       {question.options.map((opt, optIndex) => {
-        // Determine if selected: use context selection in interactive mode, otherwise use answeredValue
-        const isSelected = isInteractive
+        // Determine if selected: use context selection when awaiting input, otherwise use answeredValue
+        const isSelected = isEnabled
           ? isContextSelected(opt.label, context?.selections ?? new Map(), questionIndex, true)
           : isOptionSelected(opt.label, answeredValue, true);
 
         // Determine if should be dimmed
-        const shouldDim = isInteractive
+        const shouldDim = isEnabled
           ? hasContextSelection && !isSelected
           : answeredValue && !isSelected;
 
         const handlePress = () => {
-          if (isInteractive && context) {
+          if (isEnabled && context) {
             context.toggleOption(questionIndex, opt.label);
           }
         };
@@ -299,7 +299,7 @@ function MultiSelectQuestion({
               shouldDim ? 'opacity-50' : 'opacity-100',
               isSubmitting ? 'opacity-60' : ''
             )}>
-            <Checkbox checked={isSelected} onCheckedChange={() => {}} disabled={!isInteractive} />
+            <Checkbox checked={isSelected} onCheckedChange={() => {}} disabled={!isEnabled} />
             <View className="ml-2 flex-1">
               <Text
                 className={cn(
@@ -315,7 +315,7 @@ function MultiSelectQuestion({
           </View>
         );
 
-        if (isInteractive) {
+        if (isEnabled) {
           return (
             <Pressable key={optIndex} onPress={handlePress}>
               {content}
@@ -345,12 +345,12 @@ function QuestionSection({
   question,
   questionIndex,
   answeredValue,
-  interactive,
+  awaitingInput,
 }: {
   question: Question;
   questionIndex: number;
   answeredValue?: string;
-  interactive?: boolean;
+  awaitingInput?: boolean;
 }) {
   return (
     <View className="mb-3">
@@ -370,14 +370,14 @@ function QuestionSection({
           question={question}
           questionIndex={questionIndex}
           answeredValue={answeredValue}
-          interactive={interactive}
+          awaitingInput={awaitingInput}
         />
       ) : (
         <SingleSelectQuestion
           question={question}
           questionIndex={questionIndex}
           answeredValue={answeredValue}
-          interactive={interactive}
+          awaitingInput={awaitingInput}
         />
       )}
     </View>
@@ -387,7 +387,7 @@ function QuestionSection({
 export function AskUserQuestionDisplay({
   questions,
   answer,
-  interactive,
+  awaitingInput,
 }: AskUserQuestionDisplayProps) {
   const context = usePendingQuestionSafe();
   const isSubmitting = context?.isSubmitting ?? false;
@@ -409,7 +409,7 @@ export function AskUserQuestionDisplay({
             question={q}
             questionIndex={qIndex}
             answeredValue={answeredValue}
-            interactive={interactive && isPending}
+            awaitingInput={awaitingInput && isPending}
           />
         );
       })}
@@ -420,8 +420,8 @@ export function AskUserQuestionDisplay({
           <Text className="text-primary text-[10px] italic">Sending response...</Text>
         </View>
       )}
-      {/* Only show awaiting indicator if pending and NOT interactive and NOT submitting */}
-      {isPending && !interactive && !isSubmitting && (
+      {/* Only show awaiting indicator if pending and NOT awaiting input and NOT submitting */}
+      {isPending && !awaitingInput && !isSubmitting && (
         <View className="mt-2 flex-row items-center">
           <View className="bg-primary/20 mr-2 size-2 rounded-full" />
           <Text className="text-muted-foreground text-[10px] italic">Awaiting response...</Text>
